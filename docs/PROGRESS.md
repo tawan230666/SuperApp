@@ -36,3 +36,51 @@ In-app generated C mark replaced with neutral TC text placeholder. Original owne
 This milestone is a local execution harness. Full plan-version editing, double-entry ledger, transactional durable persistence, official paper provider, complete account/position reconciliation and background worker are NOT implemented. UI does not include a strategy library, backtest results or AI agents. Existing local assistant remains rule-based. Paper P&L is deliberately not routable into legacy allocations.
 
 No credentials are needed for the delivered simulator. Future external integration needs selected official API and paper credentials; real-money and production gates remain closed. See NEXT_STEPS for ordered continuation.
+
+# Web platform milestone — 2026-09-09
+
+## Audit / Git
+
+Current source was not a Git repository. Remote main exists at `acbb719`; SSH access worked. Safe separate checkout `/private/tmp/tipkhun-web-20260909` preserves history. Initial current-source checkpoint `04cc5e3` pushed on `feature/web-platform`; no force push. Source directory .git remains unavailable for writes under the managed policy; safe reconnection documented in `GIT_WORKFLOW.md`.
+
+Found original owner T logo in remote `assets/tipkhun-logo.png`; restored original artwork and platform icons. This resolves the previous missing-logo blocker. Existing domain, risk and allocation logic retained.
+
+## Implemented Web code
+
+- Native Router with ten URLs, retained workspace state and not-found UI. Default hash URLs preserve static-host refresh structure.
+- Shared AppShell: five mobile/tablet destinations, eight desktop sidebar destinations, account/mode/connection and profile/notification capability information.
+- Breakpoints at 600/1024, constrained 1440px content, grid cards and responsive charts.
+- Desktop paginated journal with search, asset/strategy/date filters and CSV preview/copy. Missing historical fields show —. Formula-prefix escaping included.
+- Equity, daily P&L, recorded drawdown and allocation visuals derive from existing journal; empty datasets stay empty.
+- PaperRepository abstraction and account-workspace PaperSession; UI no longer writes SharedPreferences directly. Switching routes preserves session; refresh restores paused snapshot.
+- Bot desktop/mobile metrics, risk/connection/version/market/AI capability panels, order cards and audit logs. Emergency Stop now requires explicit confirmation, tested cancellation and confirmation.
+- Read-only local Copilot reports actual paper snapshot or missing strategy/backtest; no fake AI analysis.
+- Static hosting config (`firebase.json`, `web/_headers`, `web/_redirects`) and provider-linked deployment instructions. No deployment or billing action.
+
+## Validation
+
+- Baseline: analyze clean, 33 tests passed.
+- Flutter devices: Chrome and macOS; Web already enabled. Android toolchain available. Xcode incomplete and CocoaPods missing; native iOS build not run.
+- Responsive suite: 45 tests passed after fixing a pre-existing narrow/text-scaled risk meter overflow. All app routes checked at 390/768/1024/1440/1920px, plus 320px at 150% text scale; existing mobile journal/allocation tests preserved.
+- `tool/render_web_test.dart`: 1 render test passed; 10 images under `docs/previews/web/`. Visually inspected desktop Dashboard and mobile Bot. These are Flutter renderer captures, not browser screenshots.
+- Release web build passed; local HTTP server returned 200 for built index.
+- Chrome process aborted in this environment; `flutter run -d chrome --web-browser-flag=--headless` failed to launch after 3 tries. Browser refresh/back/forward, clipboard and device E2E are NOT marked passed.
+- Final format/analyze/test/build and final push results appended after completion.
+
+## Main changed files
+
+`lib/main.dart`, `lib/navigation/app_router.dart`, `lib/ui/app_shell.dart`, `lib/ui/web_panels.dart`, `lib/ui/trade_table.dart`, `lib/ui/bot_dashboard.dart`, `lib/ui/dashboard.dart`, `lib/ui/brand_mark.dart`, `lib/data/paper_repository.dart`, `lib/state/paper_session.dart`, `lib/services/assistant_service.dart`, `test/web_platform_test.dart`, `test/bot_dashboard_test.dart`, `tool/render_web_test.dart`, original logo/icons, pubspec, Web metadata/config, README and docs.
+
+## Not implemented / not claimed
+
+No production backend, auth, market feed, live broker, real AI, backtest engine, ledger migration, worker, cross-device sync or multi-tab coordination. Current execution is local synthetic Paper only. No money, API keys, domains, paid hosting or production deployment used. Actual browser smoke testing is a release gate before merging main/deploying.
+
+### Final validation for Web commit
+
+- `dart format .`: 28 files, no outstanding formatting changes.
+- `flutter analyze --no-pub`: no issues (final check after annotating opt-in rendering test helper).
+- `flutter test --no-pub`: **45 passed**, including Emergency Stop cancel/confirm and filled-order persistence checks.
+- `flutter test tool/render_web_test.dart --no-pub`: **1 passed**, generated 10 review images.
+- `flutter build web --no-pub`: **success**, final build 60.1 seconds; `_headers` and `_redirects` included in output.
+- Existing InvestmentPlan, PaperEngine, PlanRepository, PlanStore and dependency lockfile unchanged from checkpoint, checked by Git diff.
+- Final feature commit is recorded in Git history as `feat: add responsive Tipkhun Capital web platform`; push verification performed after commit. main is intentionally unchanged pending real-browser review.

@@ -17,13 +17,35 @@ void main() {
       MaterialApp(home: BotDashboard(plan: InvestmentPlan())),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Start Paper'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Start Paper'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('ทดลองซื้อ 1 หน่วย ฿1'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('ทดลองซื้อ 1 หน่วย ฿1'));
     await tester.pumpAndSettle();
+    expect(
+      (await SharedPreferences.getInstance()).getString(
+        'tipkhun.paper.synthetic.v1',
+      ),
+      contains('"state":"filled"'),
+    );
     await tester.ensureVisible(find.text('Emergency Stop'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Emergency Stop'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ยกเลิก'));
+    await tester.pumpAndSettle();
+    expect(
+      (await SharedPreferences.getInstance()).getString(
+        'tipkhun.paper.synthetic.v1',
+      ),
+      isNot(contains('"state":"locked"')),
+    );
+    await tester.tap(find.text('Emergency Stop'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ยืนยันหยุดฉุกเฉิน'));
     await tester.pumpAndSettle();
     expect(
       (await SharedPreferences.getInstance()).getString(

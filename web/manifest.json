@@ -6,7 +6,7 @@
     "background_color": "#073C31",
     "theme_color": "#073C31",
     "description": "Tipkhun Capital risk planning",
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

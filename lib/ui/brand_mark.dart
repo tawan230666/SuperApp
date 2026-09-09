@@ -1,43 +1,38 @@
 import 'package:flutter/material.dart';
-import 'design_tokens.dart';
 
-/// Temporary text placeholder; not a replacement logo.
+/// The original Tipkhun artwork, framed around its symbol without altering it.
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 42});
   final double size;
+
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'Tipkhun Capital — placeholder รอโลโก้ต้นฉบับ',
-    textDirection: TextDirection.ltr,
+    label: 'โลโก้ Tipkhun Capital',
     image: true,
-    child: SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: CapitalMarkPainter()),
-    ),
-  );
-}
-
-class CapitalMarkPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Neutral temporary placeholder pending the owner's original T logo.
-    final text = TextPainter(
-      text: const TextSpan(
-        text: 'TC',
-        style: TextStyle(
-          color: charcoal,
-          fontSize: 30,
-          fontWeight: FontWeight.bold,
+    textDirection: TextDirection.ltr,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(size * .24),
+      child: SizedBox.square(
+        dimension: size,
+        child: ColoredBox(
+          color: Colors.white,
+          child: ClipRect(
+            child: OverflowBox(
+              maxWidth: size * 2.45,
+              maxHeight: size * 2.45,
+              child: Transform.translate(
+                offset: Offset(0, size * .25),
+                child: Image.asset(
+                  'assets/tipkhun-logo.png',
+                  width: size * 2.45,
+                  height: size * 2.45,
+                  excludeFromSemantics: true,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    text.paint(
-      canvas,
-      Offset((size.width - text.width) / 2, (size.height - text.height) / 2),
-    );
-  }
-
-  @override
-  bool shouldRepaint(CapitalMarkPainter oldDelegate) => false;
+    ),
+  );
 }

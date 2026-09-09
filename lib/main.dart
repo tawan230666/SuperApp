@@ -10,22 +10,48 @@ import 'ui/workspace_widgets.dart';
 import 'ui/dashboard.dart';
 import 'ui/bot_dashboard.dart';
 import 'ui/app_theme.dart';
+import 'ui/app_shell.dart';
+import 'ui/web_panels.dart';
+import 'ui/trade_table.dart';
+import 'navigation/app_router.dart';
+import 'data/paper_repository.dart';
+import 'state/paper_session.dart';
 
 void main() => runApp(const MyApp());
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key, this.repository, this.assistantService});
   final PlanRepository? repository;
   final AssistantService? assistantService;
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final repository = widget.repository ?? LocalPlanRepository();
+  late final assistantService =
+      widget.assistantService ?? LocalAssistantService();
+  late final router = CapitalRouter(
+    (path, navigate) => CapitalHome(
+      repository: repository,
+      assistantService: assistantService,
+      path: path,
+      onNavigate: navigate,
+    ),
+  );
+  @override
+  void dispose() {
+    router.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => MaterialApp.router(
     title: 'Tipkhun Capital',
     debugShowCheckedModeBanner: false,
     theme: buildCapitalTheme(),
-    home: CapitalHome(
-      repository: repository ?? LocalPlanRepository(),
-      assistantService: assistantService ?? LocalAssistantService(),
-    ),
+    routerDelegate: router,
+    routeInformationParser: const CapitalRouteParser(),
   );
 }
 
@@ -55,9 +81,13 @@ class CapitalHome extends StatefulWidget {
     super.key,
     required this.repository,
     required this.assistantService,
+    this.path = '/dashboard',
+    this.onNavigate,
   });
   final PlanRepository repository;
   final AssistantService assistantService;
+  final String path;
+  final ValueChanged<String>? onNavigate;
   @override
   State<CapitalHome> createState() => _CapitalHomeState();
 }
@@ -65,7 +95,15 @@ class CapitalHome extends StatefulWidget {
 class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
   late final PlanStore store;
   InvestmentPlan get plan => store.plan;
-  int page = 0, filter = 0;
+  int get page => appPaths.indexOf(widget.path);
+  void navigate(int i) {
+    widget.onNavigate?.call(appPaths[i]);
+  }
+
+  int filter = 0;
+  String journalSearch = '', journalAsset = '', journalStrategy = '';
+  DateTimeRange? journalRange;
+  final paper = PaperSession(LocalPaperRepository());
   bool chatting = false;
   String? chatError;
   final messages = <({bool user, String text})>[];
@@ -79,19 +117,14 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     'ระยะยาว',
     'ผู้ช่วย',
   ];
-  static const icons = [
-    Icons.dashboard_outlined,
-    Icons.receipt_long_outlined,
-    Icons.call_split,
-    Icons.account_balance_outlined,
-    Icons.chat_bubble_outline,
-  ];
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     store = PlanStore(widget.repository)..addListener(refresh);
-    store.load();
+    store.load().then((_) {
+      if (mounted && store.error == null) paper.load(plan);
+    });
     timer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
   }
 
@@ -110,6 +143,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     store.removeListener(refresh);
     store.dispose();
+    paper.dispose();
     chat.dispose();
     pageScroll.dispose();
     super.dispose();
@@ -117,7 +151,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 850;
+    final wide = Breakpoints.isDesktop(context);
     final now = DateTime.now();
     final date =
         '${now.day} ${const ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][now.month - 1]} ${now.year + 543}';
@@ -147,6 +181,49 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
             message: store.error!,
             onRetry: store.load,
           )
+        : page == 5
+        ? BotDashboard(
+            plan: plan,
+            session: paper,
+            embedded: true,
+            onNavigate: navigate,
+          )
+        : page == 6
+        ? SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: RiskAnalyticsPanel(plan: plan),
+          )
+        : page == 7
+        ? ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const SectionTitle('Settings'),
+              const Text('บัญชีในอุปกรณ์นี้ • Simulation / Paper เท่านั้น'),
+              OutlinedButton(
+                onPressed: settings,
+                child: const Text('ตั้งค่าและข้อมูลความเสี่ยง'),
+              ),
+              OutlinedButton(
+                onPressed: configure,
+                child: const Text('รายละเอียดแผน'),
+              ),
+            ],
+          )
+        : page == 8 || page == 9
+        ? ResearchPlaceholder(backtest: page == 9, onBack: () => navigate(5))
+        : page < 0
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('ไม่พบหน้านี้'),
+                TextButton(
+                  onPressed: () => navigate(0),
+                  child: const Text('กลับภาพรวม'),
+                ),
+              ],
+            ),
+          )
         : Column(
             children: [
               if (store.saving) const LinearProgressIndicator(minHeight: 2),
@@ -174,11 +251,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                     Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: page == 4
-                              ? 780
-                              : page == 1 || page == 3
-                              ? 960
-                              : 1160,
+                          maxWidth: page == 4 ? 1100 : 1440,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,12 +312,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                               0 => [
                                 ...[
                                   OutlinedButton.icon(
-                                    onPressed: () => Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            BotDashboard(plan: plan),
-                                      ),
-                                    ),
+                                    onPressed: () => navigate(5),
                                     icon: const Icon(Icons.smart_toy_outlined),
                                     label: const Text('Trading Bot · Paper'),
                                   ),
@@ -257,8 +325,16 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                                   saving: store.saving,
                                   onConfigure: configure,
                                   onRecord: recordTrade,
-                                  onNavigate: (i) => setState(() => page = i),
+                                  onNavigate: navigate,
                                 ),
+                                if (wide) ...[
+                                  const SizedBox(height: 20),
+                                  DashboardWebPanels(
+                                    plan: plan,
+                                    paper: paper,
+                                    onBot: () => navigate(5),
+                                  ),
+                                ],
                               ],
                               1 => journal(),
                               2 => router(),
@@ -280,135 +356,11 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
               if (page == 4) _chatComposer(),
             ],
           );
-    return Scaffold(
-      appBar: wide
-          ? null
-          : AppBar(
-              titleSpacing: 20,
-              title: const Brand(full: true),
-              actions: [
-                IconButton(
-                  onPressed: settings,
-                  tooltip: 'ตั้งค่า',
-                  icon: const Icon(Icons.tune_rounded, size: 22),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-      body: SafeArea(
-        top: wide,
-        child: Row(
-          children: [
-            if (wide)
-              SizedBox(
-                width: 228,
-                child: ColoredBox(
-                  color: charcoal,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(20, 30, 16, 34),
-                        child: DefaultTextStyle(
-                          style: TextStyle(
-                            fontFamily: 'NotoSansThai',
-                            color: Colors.white,
-                          ),
-                          child: Brand(full: true),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.only(left: 28, bottom: 14),
-                        child: Text(
-                          'WORKSPACE',
-                          style: TextStyle(fontSize: 11, color: railText),
-                        ),
-                      ),
-                      Expanded(
-                        child: NavigationRail(
-                          extended: true,
-                          minExtendedWidth: 228,
-                          selectedIndex: page,
-                          onDestinationSelected: (i) =>
-                              setState(() => page = i),
-                          destinations: List.generate(
-                            5,
-                            (i) => NavigationRailDestination(
-                              icon: Icon(icons[i], size: 21),
-                              label: Text(labels[i]),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.all(20),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF145142),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.phone_android_outlined,
-                              color: lime,
-                              size: 20,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'แผนของคุณ บนอุปกรณ์นี้',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'ยังไม่มีการซิงค์ข้ามอุปกรณ์',
-                              style: TextStyle(fontSize: 10, color: railText),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            Expanded(child: content),
-          ],
-        ),
-      ),
-      bottomNavigationBar: wide
-          ? null
-          : DecoratedBox(
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: border)),
-              ),
-              child: NavigationBar(
-                selectedIndex: page,
-                onDestinationSelected: (i) => setState(() => page = i),
-                labelTextStyle: WidgetStateProperty.resolveWith(
-                  (states) => TextStyle(
-                    fontFamily: 'NotoSansThai',
-                    fontSize: 10,
-                    fontWeight: states.contains(WidgetState.selected)
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: states.contains(WidgetState.selected)
-                        ? green
-                        : muted,
-                  ),
-                ),
-                destinations: List.generate(
-                  5,
-                  (i) => NavigationDestination(
-                    icon: Icon(icons[i], size: 22),
-                    label: labels[i],
-                  ),
-                ),
-              ),
-            ),
+    return AppShell(
+      page: page,
+      onNavigate: navigate,
+      onSettings: settings,
+      child: content,
     );
   }
 
@@ -464,7 +416,22 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
       .reversed
       .toList();
   List<Widget> journal() {
-    final records = filtered;
+    final records = filtered
+        .where(
+          (t) =>
+              (journalSearch.isEmpty ||
+                  '${t.asset} ${t.strategy} ${t.note}'.toLowerCase().contains(
+                    journalSearch.toLowerCase(),
+                  )) &&
+              (journalAsset.isEmpty || t.asset == journalAsset) &&
+              (journalStrategy.isEmpty || t.strategy == journalStrategy) &&
+              (journalRange == null ||
+                  !t.time.isBefore(journalRange!.start) &&
+                      t.time.isBefore(
+                        journalRange!.end.add(const Duration(days: 1)),
+                      )),
+        )
+        .toList();
     final net = records.fold(0, (sum, t) => sum + t.net);
     return [
       Align(
@@ -533,78 +500,98 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 20),
 
+            JournalFilters(
+              search: journalSearch,
+              asset: journalAsset,
+              strategy: journalStrategy,
+              range: journalRange,
+              trades: plan.trades,
+              onSearch: (v) => setState(() => journalSearch = v),
+              onAsset: (v) => setState(() => journalAsset = v),
+              onStrategy: (v) => setState(() => journalStrategy = v),
+              onRange: (v) => setState(() => journalRange = v),
+            ),
+            const SizedBox(height: 16),
             if (records.isEmpty) const EmptyJournal(),
-            ...records.map(
-              (t) => Column(
-                children: [
-                  const Divider(height: 20),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      IconBadge(
-                        t.net < 0 ? Icons.south_east : Icons.north_east,
-                        color: t.net < 0 ? negative : green,
-                        background: t.net < 0 ? const Color(0xFFF3E5E0) : mint,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              t.asset,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              dateLabel(t.time),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: muted,
-                              ),
-                            ),
-                            if (t.outsidePlan)
-                              const Text(
-                                'นอกแผนความเสี่ยง',
-                                style: TextStyle(color: negative, fontSize: 11),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Amount(
-                          money(t.net),
-                          size: 20,
+            if (records.isNotEmpty && Breakpoints.isDesktop(context))
+              TradeTable(records: records),
+            if (!Breakpoints.isDesktop(context))
+              ...records.map(
+                (t) => Column(
+                  children: [
+                    const Divider(height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconBadge(
+                          t.net < 0 ? Icons.south_east : Icons.north_east,
                           color: t.net < 0 ? negative : green,
+                          background: t.net < 0
+                              ? const Color(0xFFF3E5E0)
+                              : mint,
                         ),
-                      ),
-                    ],
-                  ),
-                  ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: const Text(
-                      'รายละเอียดรายการ',
-                      style: TextStyle(fontSize: 12, color: muted),
-                    ),
-                    children: [
-                      line('ค่าธรรมเนียม', money(t.fees)),
-                      if (t.strategy.isNotEmpty) line('กลยุทธ์', t.strategy),
-                      if (t.note.isNotEmpty)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Text(t.note),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                t.asset,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                dateLabel(t.time),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: muted,
+                                ),
+                              ),
+                              if (t.outsidePlan)
+                                const Text(
+                                  'นอกแผนความเสี่ยง',
+                                  style: TextStyle(
+                                    color: negative,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Amount(
+                            money(t.net),
+                            size: 20,
+                            color: t.net < 0 ? negative : green,
+                          ),
+                        ),
+                      ],
+                    ),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text(
+                        'รายละเอียดรายการ',
+                        style: TextStyle(fontSize: 12, color: muted),
+                      ),
+                      children: [
+                        line('ค่าธรรมเนียม', money(t.fees)),
+                        if (t.strategy.isNotEmpty) line('กลยุทธ์', t.strategy),
+                        if (t.note.isNotEmpty)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(t.note),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -810,7 +797,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 22),
           OutlinedButton.icon(
-            onPressed: () => setState(() => page = 2),
+            onPressed: () => navigate(2),
             icon: const Icon(Icons.add, size: 18),
             label: const Text('จัดสรรเพิ่ม'),
           ),
@@ -880,7 +867,8 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           SizedBox(height: 14),
           SectionTitle(
             'มุมมองการลงทุนระยะยาว',
-            subtitle: 'พื้นที่สำหรับทบทวนสินทรัพย์และสัดส่วนในอนาคต',
+            subtitle:
+                'Holdings / Portfolio Value / Performance / Research / AI Analysis: Coming Soon • ยังไม่มีข้อมูลตลาดจริง',
           ),
         ],
       ),
@@ -918,6 +906,8 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
         (Icons.pause_circle_outline, 'ผมควรหยุดเทรดหรือยัง?'),
         (Icons.call_split_rounded, 'กำไรวันนี้ควรแบ่งอย่างไร?'),
         (Icons.explore_outlined, 'ตอนนี้แผนของผมเป็นอย่างไร?'),
+        (Icons.smart_toy_outlined, 'สถานะบอท Paper เป็นอย่างไร?'),
+        (Icons.analytics_outlined, 'มีผล backtest ของกลยุทธ์หรือยัง?'),
       ].map(
         (q) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -1061,10 +1051,13 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     });
     _scrollChat();
     try {
-      final result = await widget.assistantService.reply(
-        q,
-        InvestmentPlan.fromJson(plan.toJson()),
-      );
+      final result =
+          await (widget.assistantService is LocalAssistantService
+                  ? LocalAssistantService(
+                      readPaper: () => paper.engine?.snapshot(),
+                    )
+                  : widget.assistantService)
+              .reply(q, InvestmentPlan.fromJson(plan.toJson()));
       if (mounted) setState(() => messages.add((user: false, text: result)));
     } catch (_) {
       if (mounted) {

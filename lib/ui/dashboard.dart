@@ -264,9 +264,16 @@ class Dashboard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '${money(used)} / ${money(max)}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            Flexible(
+              flex: 2,
+              child: Text(
+                '${money(used)} / ${money(max)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),

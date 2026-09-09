@@ -21,3 +21,13 @@ This is an additive namespace, not a database migration. SharedPreferences is no
 
 ## Gaps to target architecture
 Plan-version editing, double-entry ledger, allocation batch idempotency across processes, server persistence, authenticated gateway, workers, external broker APIs, AI structured decisions, strategy registry/backtests, sandbox and full reconciliation are pending. The present bot is a manual paper execution harness, not an autonomous strategy scheduler. Adapter covers execution operations only; account/balance/instrument/history contract must expand before external integration.
+
+## Web milestone — 2026-09-09
+
+Native Flutter Router/RouteInformationParser keeps one workspace MaterialPage, preserving plan/chat/paper state across route changes. Hash URLs avoid server deep-link rewrite dependencies. Unknown paths get an explicit not-found page. AppShell shares mobile bottom nav and desktop rail (1024 breakpoint); PanelGrid and ResponsivePageContainer adapt to available width.
+
+PaperSession owns the one local PaperEngine independently of BotDashboard. PaperRepository now isolates SharedPreferences from UI/domain. Future authenticated API adapter must replace execution, not merely replace storage. No broker secrets or critical production worker runs in the browser.
+
+Desktop journal reuses filtered TradeRecord data, with paginated DataTable and CSV preview/copy. CSV quotes fields and neutralizes spreadsheet formula prefixes. Missing legacy fields are not inferred. Chart series are derived from existing net outcomes, explicitly separate from broker equity/market quotes.
+
+Original T artwork was recovered from remote main and restored, replacing previous placeholder. Existing platform icons restored from original history. Prior `assets/brand` generated designs are no longer in Flutter's asset manifest.

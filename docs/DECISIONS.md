@@ -8,3 +8,12 @@
 6. Uncertain submission/close and persistence failure fail closed. Emergency retains positions for review rather than promising liquidation. Locked sessions cannot automatically restart.
 7. Existing brand asset and painter are a generated C, not the owner's requested T. In-app painter now shows a neutral TC text placeholder. Need owner-provided `assets/brand/tipkhun-owner-logo.png` (or original SVG) before final branding. Existing packaged launcher icons still need replacement after the original is supplied; no new logo was invented.
 8. No Git repository exists locally. Checkpoint copied to `/private/tmp/tipkhun-baseline-20260908`. Nothing pushed/published. To reconnect safely: clone the existing remote into a separate private checkout, inspect its history and visibility, compare this workspace, then import reviewed code on a branch. Do not initialize and force-push over existing history. Temporary checkpoint is not a durable backup.
+
+## Web decisions — 2026-09-09
+
+- Router API instead of go_router: finite static route set and single retained workspace, no dependency required. Keep default hash URLs and document them accurately. Actual browser Back/Forward still needs smoke testing because Chrome could not launch here.
+- Mobile and Tablet use five-item bottom navigation; ≥1024 uses desktop rail with bot/analytics/settings. Shared widgets and domain calculations remain one implementation.
+- Full financial and broker backend remains deferred. Local synthetic paper is explicitly client-only and not a security enforcement boundary.
+- Git remote was accessible by SSH; cloned separately and retained history. Managed root .git is read-only, so commits/pushes performed in separate temporary checkout; manual metadata reconnection documented.
+- Found original owner logo in GitHub `assets/tipkhun-logo.png`; restored it and original platform icons. This supersedes the earlier missing-logo decision.
+- Hosting preparation only. No auto-deploy workflow, paid account, production deployment or domain purchase configured. Free-tier comparison sourced from provider documentation.
