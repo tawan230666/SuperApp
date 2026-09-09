@@ -94,3 +94,13 @@ Fixed PaperSession lifecycle: an asynchronous load finishing after dispose no lo
 Added three regression tests in test/paper_session_test.dart. Files changed: lib/state/paper_session.dart, test/paper_session_test.dart, README.md, docs/PROGRESS.md. Financial domain, paper risk gateway and schema are unchanged.
 
 Validation run: dart format . completed (29 files); flutter analyze --no-pub reported no issues; flutter test --no-pub passed 48 tests; flutter build web --no-pub succeeded in 13.5 seconds. Actual browser smoke testing remains pending from the previous Chrome launch failure; no new browser success is claimed. Still local Mock/Paper, no real-money or backend integration.
+
+## Monorepo foundation — 2026-09-09
+
+Created `feature/platform-architecture` from the latest Web branch in a safe publishing checkout. The existing Flutter app remains at the repository root; `apps/mobile/README.md` records the staged move plan so Android/iOS package paths and local data are not changed in a bulk migration.
+
+Added a pnpm workspace with `apps/web` (React, TypeScript, Vite, responsive Tipkhun Capital dashboard), `packages/contracts`, `packages/validation`, `packages/shared`, and Node/Express service boundaries for API Gateway, Auth, Risk, Trading, Portfolio, Allocation, AI, Notifications, plus a future Python Quant boundary. The API Gateway exposes health/readiness and capability routes, proxies risk checks, and keeps Live Trading locked. Risk Service is deterministic and validates requests with shared Zod contracts; it has four unit tests covering budget, loss limit, stale data, disconnect and emergency stop behavior. Placeholder services expose honest 501 responses instead of fabricated financial data.
+
+Added PostgreSQL additive migrations with UUID/timestamptz and integer minor-unit money, Redis/Postgres Docker Compose, local environment template, and security/architecture/API/database/migration/development/deployment documentation. No production credentials, broker integration, live order route, or real-money action was added. Flutter domain and persistence code were not moved or deleted.
+
+Validation in the workspace: `pnpm test` passed **9 tests** across contracts, risk, gateway and React (remaining scaffolds use explicit pass-with-no-tests); `pnpm build` passed for all TypeScript packages and React Vite (`dist` generated successfully); `pnpm lint` passed; `flutter analyze --no-pub` passed; `flutter test --no-pub` passed **48 tests**; `docker compose -f infra/docker-compose.yml config` passed. `flutter build web --no-pub` remains green from the prior milestone. Browser Chrome smoke testing and native iOS build remain environment gates.

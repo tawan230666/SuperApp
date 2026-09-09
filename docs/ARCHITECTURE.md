@@ -31,3 +31,9 @@ PaperSession owns the one local PaperEngine independently of BotDashboard. Paper
 Desktop journal reuses filtered TradeRecord data, with paginated DataTable and CSV preview/copy. CSV quotes fields and neutralizes spreadsheet formula prefixes. Missing legacy fields are not inferred. Chart series are derived from existing net outcomes, explicitly separate from broker equity/market quotes.
 
 Original T artwork was recovered from remote main and restored, replacing previous placeholder. Existing platform icons restored from original history. Prior `assets/brand` generated designs are no longer in Flutter's asset manifest.
+
+## Monorepo foundation — 2026-09-10
+
+The repository now has a pnpm workspace with `apps/web` (React + TypeScript + Vite), a guarded `apps/mobile` migration boundary, `packages/contracts`, `packages/validation`, `packages/shared`, Node/Express service boundaries under `services/`, SQL under `database/migrations`, and local dependencies under `infra/`.
+
+The React app is a new Web client and does not duplicate Flutter business calculations: its empty dashboard explicitly waits for API data. The gateway and risk service use shared runtime schemas. The TypeScript risk gate mirrors the current conservative client rules and is tested independently; it is not yet authoritative for users because auth, persistence and tenant isolation are not enabled.

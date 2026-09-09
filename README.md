@@ -105,3 +105,15 @@ Source initially had no `.git`. Checkpoint `04cc5e3` was pushed to `feature/web-
 `tawan230666/SuperApp` is the shared Tipkhun Capital Mobile + Web repository. Business logic, data models, risk, AI interfaces and branding stay shared. Future API/server code belongs in `backend/` when implemented. Web work stays on `feature/web-platform`; trading-bot, ai-agent and backend branches can be created when those tasks begin. Merge into main after validation.
 
 A future corporate/marketing website may have its own repository; no separate Web App repository or GitHub Project is needed now. Domain examples are planning only, not purchased or deployed sites.
+
+## Monorepo foundation
+
+The repository now also contains the staged platform foundation:
+
+- `apps/web`: React + TypeScript + Vite FinTech dashboard
+- `packages/contracts`, `packages/validation`, `packages/shared`: shared API schemas and event contracts
+- `services/`: Express service boundaries, with API Gateway and deterministic Risk Service available locally
+- `database/migrations`: additive PostgreSQL schema using UUIDs, UTC timestamps and minor-unit money
+- `infra/docker-compose.yml`: local PostgreSQL and Redis, with optional service containers
+
+Run the TypeScript workspace with `pnpm install`, `pnpm test`, `pnpm build`, or `pnpm lint`. Start local infrastructure with `docker compose -f infra/docker-compose.yml up -d`. The new services are development scaffolding and Paper/Simulation only; the Flutter app remains the source of existing local business behavior until each repository is migrated and regression-tested.
