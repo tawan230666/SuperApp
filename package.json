@@ -1,0 +1,11 @@
+{
+  "name": "tipkhun-capital",
+  "private": true,
+  "packageManager": "pnpm@11.0.8",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @tipkhun/api-gateway --filter @tipkhun/risk-service dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  }
+}
