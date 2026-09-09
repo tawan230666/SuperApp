@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../domain/investment_plan.dart';
+import 'workspace_widgets.dart';
 
 Future<InvestmentPlan?> showPlanForm(
   BuildContext context,
@@ -64,29 +65,58 @@ class _PlanFormState extends State<_PlanForm> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
     title: const Text('ตั้งค่าแผนความเสี่ยง'),
     content: SizedBox(
-      width: 420,
+      width: 520,
       child: SingleChildScrollView(
         child: Form(
           key: key,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'เริ่มจากค่าตั้งต้น แล้วปรับเงินและความเสี่ยงให้เหมาะกับแผนของคุณ',
+              const FormSection(
+                '01',
+                'เลือกรูปแบบแผน',
+                'ค่าตั้งต้นเป็นจุดเริ่มต้น คุณปรับทุกค่าได้ก่อนบันทึกเทรดแรก',
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                isExpanded: true,
+                key: ValueKey(level),
                 initialValue: level,
                 decoration: const InputDecoration(labelText: 'ระดับความเสี่ยง'),
                 items: ['Low', 'Medium', 'High', 'Custom']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                          {
+                            'Low': 'ต่ำ · 2% ต่อวัน',
+                            'Medium': 'ปานกลาง · 5% ต่อวัน',
+                            'High': 'สูง · 10% ต่อวัน',
+                            'Custom': 'กำหนดเอง',
+                          }[v]!,
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => preset(v!),
               ),
               const SizedBox(height: 16),
-              for (var i = 0; i < fields.length; i++)
+              for (var i = 0; i < fields.length; i++) ...[
+                if (i == 0)
+                  const FormSection(
+                    '02',
+                    'กำหนดเงินทุนและความเสี่ยง',
+                    'งบความเสี่ยงแยกจากกำไรที่เกิดขึ้นในแต่ละวัน',
+                  ),
+                if (i == 4)
+                  const FormSection(
+                    '03',
+                    'กำหนดจุดหยุด',
+                    'ระบุขีดจำกัดขาดทุนและเป้าหมายประจำวัน',
+                  ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: TextFormField(
@@ -133,17 +163,34 @@ class _PlanFormState extends State<_PlanForm> {
                     },
                   ),
                 ),
-              Text('ระดับที่ใช้: $level'),
+              ],
+              const FormSection(
+                '04',
+                'วางแผนจัดสรรกำไร',
+                'เลือกรอบที่ต้องการทบทวน การแบ่งกำไรต้องยืนยันเอง',
+              ),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: cycle,
                 decoration: const InputDecoration(labelText: 'รอบแบ่งกำไร'),
                 items: ['Daily', 'Weekly', 'Monthly']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                          {
+                            'Daily': 'รายวัน',
+                            'Weekly': 'รายสัปดาห์',
+                            'Monthly': 'รายเดือน',
+                          }[v]!,
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => cycle = v!,
               ),
               if (error != null)
-                Text(error!, style: const TextStyle(color: Colors.red)),
+                Text(error!, style: const TextStyle(color: negative)),
             ],
           ),
         ),
@@ -252,21 +299,32 @@ class _TradeFormState extends State<_TradeForm> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
     title: const Text('บันทึกผลเทรดที่ปิดแล้ว'),
     content: SizedBox(
-      width: 420,
+      width: 520,
       child: SingleChildScrollView(
         child: Form(
           key: key,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.plan.stopReason != null)
-                Text(
-                  widget.plan.stopReason!,
-                  style: const TextStyle(color: Colors.deepOrange),
-                ),
-              for (var i = 0; i < 5; i++)
+              const FormSection(
+                '01',
+                'ข้อมูลผลเทรด',
+                'บันทึกผลที่ปิดแล้ว ระบบหักค่าธรรมเนียมเพื่อคำนวณผลสุทธิ',
+              ),
+              if (widget.plan.stopReason != null) ...[
+                Notice(widget.plan.stopReason!, warning: true),
+                const SizedBox(height: 16),
+              ],
+              for (var i = 0; i < 5; i++) ...[
+                if (i == 3)
+                  const FormSection(
+                    '02',
+                    'รายละเอียดเพิ่มเติม',
+                    'หมายเหตุและกลยุทธ์ช่วยให้ทบทวนการตัดสินใจได้',
+                  ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: TextFormField(
@@ -278,12 +336,16 @@ class _TradeFormState extends State<_TradeForm> {
                           )
                         : TextInputType.text,
                     decoration: InputDecoration(
+                      helperText: i == 1
+                          ? 'ก่อนหักค่าธรรมเนียม · ขาดทุนใส่เครื่องหมาย −'
+                          : null,
+                      helperMaxLines: 2,
                       labelText: [
                         'ชื่อสินทรัพย์',
-                        'กำไร / ขาดทุนก่อนค่าธรรมเนียม (บาท)',
+                        'กำไร / ขาดทุน (บาท)',
                         'ค่าธรรมเนียม (บาท)',
                         'หมายเหตุ',
-                        'Strategy (optional)',
+                        'กลยุทธ์ (ไม่บังคับ)',
                       ][i],
                     ),
                     validator: (v) {
@@ -300,6 +362,7 @@ class _TradeFormState extends State<_TradeForm> {
                     },
                   ),
                 ),
+              ],
               OutlinedButton.icon(
                 onPressed: pick,
                 icon: const Icon(Icons.event),
@@ -376,11 +439,14 @@ class _RatioFormState extends State<_RatioForm> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
     title: const Text('สัดส่วนแบ่งกำไร'),
     content: SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const Notice('กำหนดสัดส่วนทั้ง 3 ส่วนให้รวมกัน 100%'),
+          const SizedBox(height: 20),
           for (var i = 0; i < 3; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -393,7 +459,7 @@ class _RatioFormState extends State<_RatioForm> {
               ),
             ),
           if (error != null)
-            Text(error!, style: const TextStyle(color: Colors.red)),
+            Text(error!, style: const TextStyle(color: negative)),
         ],
       ),
     ),

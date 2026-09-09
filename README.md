@@ -1,6 +1,8 @@
 # Tipkhun Capital · Beta
 
-Flutter app for risk planning, a trade journal, and profit allocation. Continues the existing `superapp` project and package identifiers. Uses the original Tipkhun artwork, a rebuilt task-first workspace with charcoal navigation, a live risk gauge, restrained sage accents, and responsive page layouts, and bundled Noto Sans Thai typography.
+Flutter app for risk planning, a trade journal, and profit allocation. Redesigned in place as Tipkhun Capital with an emerald/white design system, a temporary text brand placeholder, responsive financial metrics, and bundled Noto Sans Thai typography. Existing `superapp` package identifiers, storage schema, and financial engine are preserved.
+
+See [redesign notes](docs/05-design-system.th.md) for components, brand assets, validation, and remaining limitations.
 
 ## Run
 
@@ -34,9 +36,12 @@ flutter run
 - `lib/domain/investment_plan.dart`: risk engine, journal, allocations, serialization and history.
 - `lib/data/plan_repository.dart`: repository interface and shared-preferences storage.
 - `lib/services/assistant_service.dart`: replaceable assistant interface and deterministic local implementation.
-- `lib/ui/brand_mark.dart`: framing for the original supplied artwork; native/web icons use the same mark.
+- `lib/ui/app_theme.dart`: shared Material theme for navigation, buttons, forms, dialogs and feedback.
+- `lib/ui/design_tokens.dart`: semantic palette and spacing scale.
+- `lib/ui/brand_mark.dart`: temporary TC text placeholder pending the owner’s original T artwork. Packaged launcher icons still need replacement.
+- `assets/brand/`: standalone SVG/PNG mark and PNG header lockup.
 - `assets/fonts/`: bundled Noto Sans Thai and OFL license for offline typography.
-- `tool/render_brand_test.dart`: regenerate platform icons and mobile/desktop previews for all five pages with `flutter test tool/render_brand_test.dart`.
+- `tool/render_brand_test.dart`: regenerate platform icons, standalone brand assets, and mobile/desktop previews for all five pages and three forms with `flutter test tool/render_brand_test.dart`.
 - `docs/previews/`: rendered previews at 320px, 390px and 1440px.
 
 ## Calculation policy
@@ -65,4 +70,13 @@ flutter test
 flutter build web
 ```
 
-Tests cover existing risk rules, daily rollover, fees, backdating, discipline, rounding, persistence/reload, corrupt data, failed saves, and all five pages at 320px, 390px and desktop navigation.
+Tests cover plan setup, locked-plan preservation, load retry, the chat keyboard/loading flow, narrow forms with larger text, existing risk rules, daily rollover, fees, backdating, discipline, rounding, persistence/reload, corrupt data, failed saves, and all five pages at 320px, 390px and desktop navigation.
+
+
+## Local Paper Trading milestone (2026-09-08)
+
+Open **ภาพรวม → Trading Bot · Paper**. Start the local mock, submit a synthetic ฿1 unit, inspect its persisted order and risk reservation, then close at the same synthetic price. Pause, Stop, Reconcile and Emergency Stop are functional. This is manual local simulation, with zero synthetic fees, no market data and no external broker connection. Paper results never enter the original allocation journal.
+
+See [architecture and gaps](docs/ARCHITECTURE.md), [progress](docs/PROGRESS.md), [decisions](docs/DECISIONS.md) and [next steps](docs/NEXT_STEPS.md). Phase 1 ledger/versioning and full Phase 2 backend execution are not complete.
+
+For restricted development environments use `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true` before Flutter/Dart commands. No telemetry permission change is required.

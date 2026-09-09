@@ -8,6 +8,8 @@ import 'ui/plan_forms.dart';
 import 'ui/brand_mark.dart';
 import 'ui/workspace_widgets.dart';
 import 'ui/dashboard.dart';
+import 'ui/bot_dashboard.dart';
+import 'ui/app_theme.dart';
 
 void main() => runApp(const MyApp());
 
@@ -19,128 +21,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Tipkhun Capital',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      fontFamily: 'NotoSansThai',
-      colorScheme: const ColorScheme.light(
-        primary: green,
-        onPrimary: Colors.white,
-        secondary: green,
-        onSecondary: Colors.white,
-        secondaryContainer: mint,
-        onSecondaryContainer: ink,
-        surface: surface,
-        onSurface: ink,
-        surfaceContainerHighest: mint,
-        outline: border,
-        error: Color(0xFFAD5142),
-      ),
-      scaffoldBackgroundColor: canvas,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: canvas,
-        foregroundColor: ink,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        toolbarHeight: 72,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: border,
-        thickness: 1,
-        space: 28,
-      ),
-      navigationBarTheme: const NavigationBarThemeData(
-        backgroundColor: surface,
-        indicatorColor: mint,
-        iconTheme: WidgetStatePropertyAll(IconThemeData(color: green)),
-        elevation: 0,
-        height: 74,
-      ),
-      navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: charcoal,
-        indicatorColor: Color(0xFF425142),
-        selectedIconTheme: IconThemeData(color: Colors.white),
-        unselectedIconTheme: IconThemeData(color: railText),
-        selectedLabelTextStyle: TextStyle(
-          fontFamily: 'NotoSansThai',
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-        ),
-        unselectedLabelTextStyle: TextStyle(
-          fontFamily: 'NotoSansThai',
-          color: railText,
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 52),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: const TextStyle(
-            fontFamily: 'NotoSansThai',
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          side: const BorderSide(color: border),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: canvas,
-        selectedColor: mint,
-        side: BorderSide.none,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        labelStyle: const TextStyle(
-          fontFamily: 'NotoSansThai',
-          color: ink,
-          fontSize: 12,
-        ),
-        padding: const EdgeInsets.all(7),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: green, width: 1.5),
-        ),
-        filled: true,
-        fillColor: surface,
-        labelStyle: const TextStyle(fontFamily: 'NotoSansThai', color: muted),
-        contentPadding: const EdgeInsets.all(18),
-      ),
-      textTheme: const TextTheme(
-        bodyMedium: TextStyle(fontSize: 14, height: 1.55, color: ink),
-        bodyLarge: TextStyle(fontSize: 16, height: 1.5, color: ink),
-        headlineMedium: TextStyle(
-          fontSize: 27,
-          height: 1.3,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -.6,
-          color: ink,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 18,
-          height: 1.4,
-          fontWeight: FontWeight.w600,
-          color: ink,
-        ),
-      ),
-    ),
+    theme: buildCapitalTheme(),
     home: CapitalHome(
       repository: repository ?? LocalPlanRepository(),
       assistantService: assistantService ?? LocalAssistantService(),
@@ -189,6 +70,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
   String? chatError;
   final messages = <({bool user, String text})>[];
   final chat = TextEditingController();
+  final pageScroll = ScrollController(keepScrollOffset: false);
   Timer? timer;
   static const labels = [
     'ภาพรวม',
@@ -201,7 +83,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     Icons.dashboard_outlined,
     Icons.receipt_long_outlined,
     Icons.call_split,
-    Icons.savings_outlined,
+    Icons.account_balance_outlined,
     Icons.chat_bubble_outline,
   ];
   @override
@@ -229,6 +111,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     store.removeListener(refresh);
     store.dispose();
     chat.dispose();
+    pageScroll.dispose();
     super.dispose();
   }
 
@@ -239,11 +122,11 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
     final date =
         '${now.day} ${const ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][now.month - 1]} ${now.year + 543}';
     final titles = [
-      'วันนี้ของคุณ',
-      'สมุดบันทึกเทรด',
-      'จัดสรรให้ทุกเป้าหมาย',
-      'สร้างอนาคตทีละก้าว',
-      'มาคุยเรื่องแผนของคุณ',
+      'ภาพรวมการเงิน',
+      'บันทึกการเทรด',
+      'จัดสรรกำไร',
+      'เงินทุนระยะยาว',
+      'ผู้ช่วยวางแผน',
     ];
     final descriptions = [
       'จัดการความเสี่ยง แล้วก้าวต่ออย่างมีแผน',
@@ -253,19 +136,16 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
       'ทบทวนตัวเลขและสถานะจากบันทึกของคุณ',
     ];
     final content = store.loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const WorkspaceState(
+            title: 'กำลังโหลดแผนของคุณ',
+            message: 'กำลังอ่านข้อมูลจากอุปกรณ์',
+            loading: true,
+          )
         : store.error != null && store.error!.startsWith('อ่าน')
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(store.error!),
-                FilledButton(
-                  onPressed: store.load,
-                  child: const Text('ลองใหม่'),
-                ),
-              ],
-            ),
+        ? WorkspaceState(
+            title: 'ไม่สามารถโหลดข้อมูลได้',
+            message: store.error!,
+            onRetry: store.load,
           )
         : Column(
             children: [
@@ -283,6 +163,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
               Expanded(
                 child: ListView(
                   key: ValueKey(page),
+                  controller: pageScroll,
                   padding: EdgeInsets.fromLTRB(
                     wide ? 40 : 20,
                     wide ? 36 : 12,
@@ -313,7 +194,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                                       Text(
                                         page == 0
                                             ? date
-                                            : 'TIPKHUN / ${labels[page]}',
+                                            : 'TIPKHUN CAPITAL / ${labels[page]}',
                                         style: const TextStyle(
                                           fontSize: 11,
                                           color: muted,
@@ -356,6 +237,21 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                             const SizedBox(height: 26),
                             ...switch (page) {
                               0 => [
+                                ...[
+                                  OutlinedButton.icon(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            BotDashboard(plan: plan),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.smart_toy_outlined),
+                                    label: const Text('Trading Bot · Paper'),
+                                  ),
+                                  const Text(
+                                    'Simulation / Planning • ข้อมูลบันทึก ไม่ใช่บัญชีโบรกเกอร์',
+                                  ),
+                                ],
                                 Dashboard(
                                   plan: plan,
                                   saving: store.saving,
@@ -381,6 +277,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+              if (page == 4) _chatComposer(),
             ],
           );
     return Scaffold(
@@ -423,7 +320,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                       const Padding(
                         padding: EdgeInsets.only(left: 28, bottom: 14),
                         child: Text(
-                          'พื้นที่ของคุณ',
+                          'WORKSPACE',
                           style: TextStyle(fontSize: 11, color: railText),
                         ),
                       ),
@@ -447,7 +344,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
                         margin: const EdgeInsets.all(20),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF303D35),
+                          color: const Color(0xFF145142),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Column(
@@ -580,12 +477,12 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
       ),
       const SizedBox(height: 18),
       panel(
-        color: const Color(0xFFE4E9DE),
+        color: mint,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'ผลสุทธิในช่วงที่เลือก',
+              'กำไร / ขาดทุนสุทธิ',
               style: TextStyle(fontSize: 12, color: muted),
             ),
             const SizedBox(height: 6),
@@ -598,6 +495,21 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           ],
         ),
       ),
+      MetricGrid(
+        children: [
+          MetricCard(
+            label: 'จำนวนรายการ',
+            value: '${records.length}',
+            icon: Icons.receipt_long_outlined,
+          ),
+          MetricCard(
+            label: 'ค่าธรรมเนียมรวม',
+            value: money(records.fold(0, (sum, t) => sum + t.fees)),
+            icon: Icons.payments_outlined,
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
       panel(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -766,7 +678,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'ให้กำไรเดินทางต่อ',
+              'กำไรพร้อมจัดสรร',
               style: TextStyle(fontSize: 13, color: railText),
             ),
             const SizedBox(height: 16),
@@ -800,6 +712,10 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           child: const Text('แก้สัดส่วน'),
         ),
       ),
+      AllocationBar(
+        values: [plan.shortPercent, plan.longPercent, plan.withdrawPercent],
+      ),
+      const SizedBox(height: 20),
       _responsiveCards([
         _bucket(
           'ต่อยอดทุน',
@@ -807,15 +723,15 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           plan.shortPercent,
           a.short,
           Icons.autorenew_rounded,
-          const Color(0xFFE1E9DD),
+          mint,
         ),
         _bucket(
           'สะสมระยะยาว',
           'สำหรับเป้าหมายในอนาคต',
           plan.longPercent,
           a.long,
-          Icons.savings_outlined,
-          const Color(0xFFE4E8E9),
+          Icons.account_balance_outlined,
+          const Color(0xFFEDF4F2),
         ),
         _bucket(
           'กันไว้ถอน',
@@ -823,7 +739,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           plan.withdrawPercent,
           a.withdraw,
           Icons.account_balance_wallet_outlined,
-          const Color(0xFFEDE7DB),
+          const Color(0xFFF8F3E9),
         ),
       ]),
       const SizedBox(height: 20),
@@ -871,12 +787,12 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
 
   List<Widget> longTerm() => [
     panel(
-      color: const Color(0xFFE4E9DE),
+      color: mint,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const IconBadge(
-            Icons.savings_outlined,
+            Icons.account_balance_outlined,
             background: surface,
             size: 48,
           ),
@@ -889,7 +805,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           Amount(money(plan.longTerm), size: 44),
           const SizedBox(height: 10),
           const Text(
-            'ทีละส่วนของกำไร เพื่อเป้าหมายที่ใหญ่ขึ้น',
+            'ยอดจัดสรรสะสมจากกำไรที่บันทึกไว้',
             style: TextStyle(fontSize: 12, color: muted),
           ),
           const SizedBox(height: 22),
@@ -911,7 +827,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
           ),
           if (plan.allocations.isEmpty)
             const EmptyJournal(
-              title: 'เป้าหมายระยะยาว เริ่มได้จากก้าวเล็ก ๆ',
+              title: 'ยังไม่มีการจัดสรรระยะยาว',
               description:
                   'เมื่อแบ่งกำไรเข้าระยะยาว\nยอดสะสมแต่ละครั้งจะแสดงที่นี่',
             ),
@@ -950,8 +866,13 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
         ],
       ),
     ),
+    const Notice(
+      'ยอดสะสมนี้เป็นการกันเงินตามแผน ยังไม่ใช่มูลค่าพอร์ตลงทุนหรือราคาตลาด',
+      icon: Icons.account_balance_outlined,
+    ),
+    const SizedBox(height: 20),
     panel(
-      color: const Color(0xFFE8E7E1),
+      color: surface,
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -969,14 +890,14 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
   List<Widget> assistant() => [
     if (messages.isEmpty) ...[
       panel(
-        color: const Color(0xFFE6EAD9),
+        color: mint,
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            IconBadge(Icons.forum_outlined, background: surface, size: 52),
+            BrandMark(size: 52),
             SizedBox(height: 22),
             Text(
-              'เข้าใจแผนของคุณ\nทีละคำถาม',
+              'ทบทวนแผนกับผู้ช่วย',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
@@ -985,7 +906,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
             ),
             SizedBox(height: 12),
             Text(
-              'ถามเรื่องงบความเสี่ยง จุดหยุด หรือการแบ่งกำไร\nผู้ช่วยจะอธิบายจากข้อมูลที่คุณบันทึกไว้',
+              'เข้าใจงบความเสี่ยง จุดหยุด และการแบ่งกำไรจากข้อมูลของคุณ',
               style: TextStyle(fontSize: 13, color: muted),
             ),
           ],
@@ -1032,7 +953,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  m.user ? 'คุณ' : 'ผู้ช่วยทบทวนแผน',
+                  m.user ? 'คุณ' : 'Tipkhun Capital · ผู้ช่วย',
                   style: const TextStyle(
                     fontSize: 11,
                     color: muted,
@@ -1047,30 +968,89 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
         ),
       ),
     ),
-    if (chatting) const LinearProgressIndicator(),
-    if (chatError != null)
-      Text(chatError!, style: const TextStyle(color: negative)),
-    const SizedBox(height: 10),
-    TextField(
-      controller: chat,
-      minLines: 1,
-      maxLines: 4,
-      enabled: !chatting,
-      decoration: InputDecoration(
-        hintText: 'พิมพ์คำถามเกี่ยวกับแผน…',
-        suffixIcon: IconButton(
-          tooltip: 'ส่งคำถาม',
-          onPressed: chatting ? null : () => ask(chat.text),
-          icon: const Icon(Icons.arrow_upward_rounded),
+    if (chatting)
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'กำลังทบทวนข้อมูลแผน…',
+                style: TextStyle(color: muted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    if (chatError != null) ...[
+      Notice(chatError!, warning: true),
+      TextButton.icon(
+        onPressed: chatting
+            ? null
+            : () => ask(messages.lastWhere((m) => m.user).text),
+        icon: const Icon(Icons.refresh),
+        label: const Text('ลองส่งอีกครั้ง'),
+      ),
+    ],
+  ];
+
+  Widget _chatComposer() => Container(
+    decoration: const BoxDecoration(
+      color: surface,
+      border: Border(top: BorderSide(color: border)),
+    ),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 780),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: chat,
+              minLines: 1,
+              maxLines: 4,
+              enabled: !chatting,
+              decoration: InputDecoration(
+                hintText: 'ถามเกี่ยวกับแผนของคุณ…',
+                suffixIcon: IconButton.filled(
+                  style: IconButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: green,
+                  ),
+                  tooltip: 'ส่งคำถาม',
+                  onPressed: chatting ? null : () => ask(chat.text),
+                  icon: const Icon(Icons.arrow_upward_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'อ้างอิงข้อมูลในแผน · ใช้กฎภายใน ยังไม่เชื่อมต่อ AI',
+              style: TextStyle(fontSize: 11, color: muted),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     ),
-    const SizedBox(height: 12),
-    const Text(
-      'ผู้ช่วยใช้กฎจากข้อมูลแผน ยังไม่ได้เชื่อมต่อบริการ AI',
-      style: TextStyle(fontSize: 11, color: muted),
-    ),
-  ];
+  );
+
+  void _scrollChat() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted && page == 4 && pageScroll.hasClients) {
+      pageScroll.animateTo(
+        pageScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  });
+
   Future<void> ask(String q) async {
     if (q.trim().isEmpty || chatting) return;
     setState(() {
@@ -1079,6 +1059,7 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
       chatError = null;
       chat.clear();
     });
+    _scrollChat();
     try {
       final result = await widget.assistantService.reply(
         q,
@@ -1090,11 +1071,50 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
         setState(() => chatError = 'ผู้ช่วยไม่พร้อม กรุณาลองส่งคำถามอีกครั้ง');
       }
     } finally {
-      if (mounted) setState(() => chatting = false);
+      if (mounted) {
+        setState(() => chatting = false);
+        _scrollChat();
+      }
     }
   }
 
   Future<void> configure() async {
+    if (plan.trades.isNotEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('รายละเอียดแผน'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Notice(
+                    'แผนล็อกหลังบันทึกเทรดแรก เพื่อรักษาเกณฑ์คำนวณย้อนหลัง',
+                    icon: Icons.lock_outline,
+                  ),
+                  const SizedBox(height: 16),
+                  line('เงินตั้งต้น', money(plan.capital)),
+                  line('งบความเสี่ยงต่อวัน', money(plan.budget)),
+                  line('ความเสี่ยงต่อเทรด', money(plan.riskPerTrade)),
+                  line('จำนวนเทรดสูงสุด', '${plan.maxTrades}'),
+                  line('ขีดจำกัดขาดทุน', money(plan.dailyLossLimit)),
+                  line('เป้าหมายกำไร', money(plan.target)),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final next = await showPlanForm(context, plan);
     if (next != null) await store.replace(next);
   }
@@ -1130,8 +1150,33 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('ยืนยันการกันกำไร'),
-        content: Text(
-          'กำไร ${money(a.amount)}\nระยะสั้น ${money(a.short)}\nระยะยาว ${money(a.long)}\nถอน ${money(a.withdraw)}\nบันทึกเท่านั้น ไม่มีการโอนเงิน',
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('ยอดจัดสรรครั้งนี้', style: TextStyle(color: muted)),
+                const SizedBox(height: 8),
+                Amount(money(a.amount), size: 36),
+                const SizedBox(height: 20),
+                AllocationBar(
+                  values: [
+                    plan.shortPercent,
+                    plan.longPercent,
+                    plan.withdrawPercent,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                line('ต่อยอดทุน', money(a.short)),
+                line('สะสมระยะยาว', money(a.long)),
+                line('กันไว้ถอน', money(a.withdraw)),
+                const SizedBox(height: 12),
+                const Notice('บันทึกการจัดสรรเท่านั้น ไม่มีการโอนเงินจริง'),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -1161,6 +1206,25 @@ class _CapitalHomeState extends State<CapitalHome> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 heading('ตั้งค่า'),
+                ListTile(
+                  leading: const Icon(Icons.tune_rounded),
+                  title: Text(
+                    plan.trades.isEmpty
+                        ? 'ตั้งค่าแผนความเสี่ยง'
+                        : 'รายละเอียดแผน',
+                  ),
+                  subtitle: Text(
+                    plan.trades.isEmpty
+                        ? 'เงินตั้งต้นและขอบเขตการเทรด'
+                        : 'แผนที่ใช้คำนวณประวัติของคุณ',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(c);
+                    configure();
+                  },
+                ),
+
                 ListTile(
                   title: const Text('ข้อมูลการใช้งานและความเสี่ยง'),
                   trailing: const Icon(Icons.chevron_right),
