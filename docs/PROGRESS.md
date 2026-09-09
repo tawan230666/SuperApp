@@ -84,3 +84,13 @@ No production backend, auth, market feed, live broker, real AI, backtest engine,
 - `flutter build web --no-pub`: **success**, final build 60.1 seconds; `_headers` and `_redirects` included in output.
 - Existing InvestmentPlan, PaperEngine, PlanRepository, PlanStore and dependency lockfile unchanged from checkpoint, checked by Git diff.
 - Final feature commit is recorded in Git history as `feat: add responsive Tipkhun Capital web platform`; push verification performed after commit. main is intentionally unchanged pending real-browser review.
+
+## Shared-repository follow-up — 2026-09-09
+
+Confirmed Mobile and Web remain in tawan230666/SuperApp, with Web on feature/web-platform. No new repository, Flutter project, domain or marketing site created. Remote branch and local publishing checkout were both at c56009e before changes; working checkout was clean. Source .git remains read-only/unconnected under the managed policy; existing separate-checkout workflow retained.
+
+Fixed PaperSession lifecycle: an asynchronous load finishing after dispose no longer creates an abandoned engine or notifies disposed listeners. New actions are refused after dispose while already-started work can finish. A pending-operation counter now keeps busy true until both ordinary and emergency work complete, preventing premature re-enabling of controls.
+
+Added three regression tests in test/paper_session_test.dart. Files changed: lib/state/paper_session.dart, test/paper_session_test.dart, README.md, docs/PROGRESS.md. Financial domain, paper risk gateway and schema are unchanged.
+
+Validation run: dart format . completed (29 files); flutter analyze --no-pub reported no issues; flutter test --no-pub passed 48 tests; flutter build web --no-pub succeeded in 13.5 seconds. Actual browser smoke testing remains pending from the previous Chrome launch failure; no new browser success is claimed. Still local Mock/Paper, no real-money or backend integration.

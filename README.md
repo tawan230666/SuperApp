@@ -99,3 +99,9 @@ No production auth, payments, cloud sync, worker, official broker, market feed, 
 Source initially had no `.git`. Checkpoint `04cc5e3` was pushed to `feature/web-platform` without rewriting main. Managed workspace `.git` is read-only; commit/push uses a separate checkout. See [GIT_WORKFLOW](docs/GIT_WORKFLOW.md) for reconnecting source metadata safely
 
 [Architecture](docs/ARCHITECTURE.md) · [Decisions](docs/DECISIONS.md) · [Next Steps](docs/NEXT_STEPS.md)
+
+## Repository policy
+
+`tawan230666/SuperApp` is the shared Tipkhun Capital Mobile + Web repository. Business logic, data models, risk, AI interfaces and branding stay shared. Future API/server code belongs in `backend/` when implemented. Web work stays on `feature/web-platform`; trading-bot, ai-agent and backend branches can be created when those tasks begin. Merge into main after validation.
+
+A future corporate/marketing website may have its own repository; no separate Web App repository or GitHub Project is needed now. Domain examples are planning only, not purchased or deployed sites.
