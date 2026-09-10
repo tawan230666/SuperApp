@@ -58,6 +58,8 @@ app.*.map.json
 **/ephemeral/
 **/.gradle/
 node_modules/
+**/.pnpm-store/
+*.tsbuildinfo
 playwright-report/
 test-results/
 # Personal reference documents are not app assets

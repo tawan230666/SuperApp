@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {pool,transaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
 import {currentPlan,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
-export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage']).default('fill')}).strict();
+export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage','profit','even']).default('fill')}).strict();
 const fee=(notional:bigint)=>(notional+999n)/1000n; // 10bps rounded up in minor units.
 export async function account(c:PoolClient,userId:string){return (await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[userId])).rows[0]??null;}
 async function ownedOrder(c:PoolClient,userId:string,id:string){const o=(await c.query("SELECT o.* FROM orders o JOIN accounts a ON a.id=o.account_id WHERE o.id=$1 AND a.user_id=$2 AND o.paper_order",[id,userId])).rows[0];if(!o)throw new HttpError(404,'Order not found');return o;}
@@ -67,7 +67,7 @@ export async function control(userId:string,action:string,requestId:string){
  });
 }
 export async function createOrder(userId:string,input:unknown,key:string,token:string,requestId:string){
- const d=orderSchema.parse(input);if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
+ const d=orderSchema.parse(input);if(['profit','even'].includes(d.scenario)&&process.env.NODE_ENV!=='test'&&process.env.TEST_MODE!=='1')throw new HttpError(400,'Test price scenario is disabled');if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
  const hash=createHash('sha256').update(JSON.stringify(d)).digest('hex');
  const o=await transaction(async c=>{
   await lockOwner(c,userId);const a=await account(c,userId);if(!a)throw new HttpError(409,'Start paper account first');
@@ -118,14 +118,15 @@ export async function closePosition(userId:string,id:string,requestId:string){re
  if(p.state==='CLOSED')return (await c.query('SELECT * FROM trades WHERE paper_order_id=$1',[p.order_id])).rows[0];
  const o=await ownedOrder(c,userId,p.order_id);if(o.state==='UNKNOWN')throw new HttpError(409,'Unknown outcome requires reconciliation before closing');
  if(o.state==='PARTIALLY_FILLED')await cancelLocked(c,userId,o,requestId);
- const quantity=BigInt(String(p.quantity).split('.')[0]),price=99n,proceeds=quantity*price,fees=fee(proceeds),net=proceeds-BigInt(p.cost_minor)-BigInt(p.entry_fees_minor)-fees;
+ const quantity=BigInt(String(p.quantity).split('.')[0]),price=o.scenario==='profit'?120n:o.scenario==='even'?101n:99n,proceeds=quantity*price,fees=fee(proceeds),net=proceeds-BigInt(p.cost_minor)-BigInt(p.entry_fees_minor)-fees;
  await c.query("INSERT INTO paper_broker_fills(order_id,side,quantity,price_minor,fee_minor) VALUES($1,'SELL',$2,$3,$4)",[o.id,quantity.toString(),price.toString(),fees.toString()]);
  await c.query("UPDATE paper_broker_orders SET state='CLOSED' WHERE order_id=$1",[o.id]);
  await c.query("UPDATE positions SET state='CLOSED' WHERE id=$1",[p.id]);
  const trade=(await c.query("INSERT INTO trades(account_id,plan_version_id,paper_order_id,net_pnl_minor,fees_minor,mode) VALUES($1,$2,$3,$4,$5,'paper') RETURNING *",[p.account_id,o.plan_version_id,o.id,net.toString(),(BigInt(p.entry_fees_minor)+fees).toString()])).rows[0];
  await c.query('UPDATE accounts SET cash_minor=cash_minor+$2,fees_minor=fees_minor+$3,realized_pnl_minor=realized_pnl_minor+$4 WHERE id=$1',[p.account_id,(proceeds-fees).toString(),fees.toString(),net.toString()]);
  const pricePnl=proceeds-BigInt(p.cost_minor);
- await ledgerTransaction(c,userId,p.account_id,'PAPER_SETTLEMENT',o.id,`settle:${o.id}`,[{bucket:'PAPER_CASH',direction:'DEBIT',amount:proceeds},{bucket:'TRADING_CAPITAL',direction:'CREDIT',amount:BigInt(p.cost_minor)},{bucket:'REALIZED_PROFIT',direction:pricePnl>=0n?'CREDIT':'DEBIT',amount:pricePnl>=0n?pricePnl:-pricePnl}]);
+ const settlement=[{bucket:'PAPER_CASH',direction:'DEBIT' as const,amount:proceeds},{bucket:'TRADING_CAPITAL',direction:'CREDIT' as const,amount:BigInt(p.cost_minor)}]; if(pricePnl!==0n) settlement.push({bucket:'REALIZED_PROFIT',direction:pricePnl>0n?'CREDIT':'DEBIT',amount:pricePnl>0n?pricePnl:-pricePnl});
+ await ledgerTransaction(c,userId,p.account_id,'PAPER_SETTLEMENT',o.id,`settle:${o.id}`,settlement);
  await ledgerTransaction(c,userId,p.account_id,'PAPER_EXIT_FEE',o.id,`exit-fee:${o.id}`,[{bucket:'FEES',direction:'DEBIT',amount:fees},{bucket:'PAPER_CASH',direction:'CREDIT',amount:fees}]);
  const allFees=BigInt(p.entry_fees_minor)+fees;
  if(allFees>0n) await ledgerTransaction(c,userId,p.account_id,'PAPER_FEE_TO_PNL',o.id,`fee-pnl:${o.id}`,[{bucket:'REALIZED_PROFIT',direction:'DEBIT',amount:allFees},{bucket:'FEES',direction:'CREDIT',amount:allFees}]);
