@@ -188,7 +188,7 @@ Node/React unit **25/25**, browser E2E **passed**, and Flutter **48/48**. Lint,
 build and migration checks passed. Live Trading is LOCKED; all broker data is
 synthetic Paper.
 
-## Phase 4 — Trading Operations + Ledger + Profit Router — IN PROGRESS — 2026-09-10
+## Phase 4 — Trading Operations + Ledger + Profit Router — COMPLETED — 2026-09-10
 
 Migration 006 adds immutable double-entry Paper ledger buckets, allocation
 settings/batches, notifications and reserve buckets. Paper fills and closes
@@ -196,5 +196,9 @@ post balanced ledger transactions. Allocation Service now provides
 server-derived realized-profit preview/confirm, idempotency and owner scoped
 ledger/summary/reserve APIs. Trading monitoring marks stale heartbeats and
 reconciliation failures. Flutter has a secure-storage HTTP transport and remote
-allocation boundary while local repositories remain the default. Final browser
-and full-suite acceptance is pending.
+allocation boundary while local repositories remain the default. Test-only
+`profit` and `even` scenarios derive exit fills, fees and net P&L from persisted
+data; production mode rejects those controls. Full acceptance passed: Phase 2
+27/27, Paper/ledger/allocation integration 24/24, browser E2E including profit
+allocation, React unit 7/7, Flutter 49/49, lint and build, with zero failed and
+zero skipped acceptance tests.

@@ -10,3 +10,8 @@ to withdrawal reserve so totals always equal the source amount.
 Preview is read-only. Confirm creates one ledger transaction and allocation
 batch in the same PostgreSQL transaction. Withdrawal reserve is a planning
 bucket, never a withdrawal or cash movement outside the Paper ledger.
+
+The acceptance flow verifies 50/30/20 routing, 101-minor-unit remainder
+rounding, preview side-effect freedom, concurrent confirmation locking,
+idempotent retries, owner isolation and shared backend reads from Flutter's
+remote repository.
