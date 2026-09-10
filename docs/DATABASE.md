@@ -48,3 +48,7 @@ trigger. Migration 005 adds evidence-backed UNKNOWN recovery transitions. Accoun
 cash, fees, positions, fills and realized P&L are mutated in a transaction; the
 reconciliation function compares the persisted ledger against broker evidence.
 No destructive reset or volume deletion is used.
+Migration 006 adds immutable `ledger_accounts`, `ledger_transactions`,
+`ledger_entries`, `allocation_settings`, `allocation_batches`, and
+`notifications`. Ledger entries are protected by a database trigger and all
+allocation confirmation writes occur in one transaction.

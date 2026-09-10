@@ -45,6 +45,13 @@ Phase 2 + Phase 3 integration suites passed. Remaining work is execution
 hardening: richer order/position UX, configurable broker policy, and Flutter HTTP
 transport with mobile secure storage. Live trading remains LOCKED.
 
+## Phase 4 — current implementation
+
+Immutable Paper ledger, reserve buckets, allocation settings/confirm APIs,
+notifications and stale-bot monitoring are implemented. Complete the dedicated
+ledger/allocation integration flow, richer order/position screens and Flutter
+remote transport coverage before marking Phase 4 complete.
+
 ## Phase 2 acceptance closed — next: Phase 3 Paper Trading
 
 The earlier blocker is resolved. PostgreSQL integration and real React browser

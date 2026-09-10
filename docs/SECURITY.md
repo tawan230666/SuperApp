@@ -74,3 +74,7 @@ entity, request and source metadata only; passwords and tokens are never stored.
 All execution is deterministic synthetic Paper Broker data. Live brokers,
 real-money execution, withdrawals, production deployment and AI overrides are
 LOCKED.
+Ledger entries are immutable and allocation confirmation uses owner row locks,
+unique idempotency keys and server-derived realized profit. Client submitted
+cash, profit or allocation totals are never trusted. Mobile refresh credentials
+use OS secure storage in the remote transport; local mode remains available.

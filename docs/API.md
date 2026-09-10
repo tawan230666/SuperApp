@@ -86,3 +86,10 @@ No broker or real-money execution path exists.
 Health: `/health` liveness; `/ready` checks DB and required auth/risk schema on
 Gateway/Auth/Risk, responds 503 on dependency failure. Validation 400, auth 401,
 role denial 403, conflict 409; unexpected errors sanitized to 503.
+## Phase 4 Paper operations and ledger
+
+Authenticated Gateway routes proxy order/position/trade detail, reconciliation,
+ledger summary/transactions, notifications, allocation settings/available/
+preview/confirm/history, long-term cash and withdrawal reserve. Allocation
+confirm requires `Idempotency-Key` and derives realized profit from PostgreSQL.
+All values are Paper minor units; live execution remains LOCKED.

@@ -83,3 +83,8 @@ feed, live broker, AI override or real-money execution exists.
 Phase 2 acceptance update: Gateway proxies /api/v1/auth to Auth Service through
 AUTH_SERVICE_URL. Earlier direct shared-router mounting is historical. Both
 Gateway/Auth/DB and Gateway/Risk/DB network paths passed integration acceptance.
+Phase 4 extends the flow with a background Paper monitor and Allocation Service:
+Trading/Paper fills post double-entry ledger transactions; allocation preview
+and confirmation consume only server-derived realized profit. React and Flutter
+read the same authenticated Gateway resources. No in-memory state is treated as
+authoritative.
