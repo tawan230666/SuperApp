@@ -222,10 +222,10 @@ export async function ensureLedgerAccounts(c:PoolClient,userId:string,accountId:
 }
 export async function ledgerTransaction(c:PoolClient,userId:string,accountId:string,type:string,referenceId:string|null,key:string,moves:Array<{bucket:string;direction:'DEBIT'|'CREDIT';amount:bigint}>){
  const debit=moves.filter(x=>x.direction==='DEBIT').reduce((a,x)=>a+x.amount,0n),credit=moves.filter(x=>x.direction==='CREDIT').reduce((a,x)=>a+x.amount,0n);
- if(debit<=0n||debit!==credit)throw new HttpError(400,'Unbalanced ledger transaction');
+ if(moves.some(m=>m.amount<0n)||debit<=0n||debit!==credit)throw new HttpError(400,'Unbalanced ledger transaction');
  const existing=(await c.query('SELECT id FROM ledger_transactions WHERE idempotency_key=$1',[key])).rows[0]; if(existing)return existing.id;
  const tx=(await c.query('INSERT INTO ledger_transactions(user_id,account_id,transaction_type,reference_entity,reference_id,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[userId,accountId,type,'paper',referenceId,key])).rows[0];
- for(const m of moves){const a=(await c.query('SELECT id FROM ledger_accounts WHERE user_id=$1 AND account_id=$2 AND bucket=$3',[userId,accountId,m.bucket])).rows[0];if(!a)throw new HttpError(500,'Ledger account missing');await c.query('INSERT INTO ledger_entries(transaction_id,ledger_account_id,direction,amount_minor) VALUES($1,$2,$3,$4)',[tx.id,a.id,m.direction,m.amount.toString()]);}
+ for(const m of moves.filter(m=>m.amount!==0n)){const a=(await c.query('SELECT id FROM ledger_accounts WHERE user_id=$1 AND account_id=$2 AND bucket=$3',[userId,accountId,m.bucket])).rows[0];if(!a)throw new HttpError(500,'Ledger account missing');await c.query('INSERT INTO ledger_entries(transaction_id,ledger_account_id,direction,amount_minor) VALUES($1,$2,$3,$4)',[tx.id,a.id,m.direction,m.amount.toString()]);}
  return tx.id;
 }
 export async function notify(c:PoolClient,userId:string,eventType:string,entity:string|null,entityId:string|null,payload:unknown={}){
@@ -240,6 +240,8 @@ export async function reservePaperOrder(userId:string,orderId:string,requestId:s
   if(row.state!=='CREATED')return {approved:['RISK_CHECKED','SUBMITTED','ACKNOWLEDGED','PARTIALLY_FILLED','FILLED','CLOSED'].includes(row.state),orderId,state:row.state};
   const s=await snapshot(c,userId,true);
   const outstanding=(await c.query("SELECT coalesce(sum(r.amount_minor),0)::text AS amount FROM risk_reservations r JOIN orders o ON o.id=r.order_id WHERE o.account_id=$1 AND r.released_at IS NULL",[row.account_id])).rows[0];
+  const earmarked=(await c.query("SELECT coalesce(sum(CASE WHEN e.direction='CREDIT' THEN e.amount_minor ELSE -e.amount_minor END),0)::text AS amount FROM ledger_entries e JOIN ledger_accounts a ON a.id=e.ledger_account_id WHERE a.user_id=$1 AND a.bucket IN ('LONG_TERM_RESERVE','WITHDRAWAL_RESERVE')",[userId])).rows[0];
+  const funded=(await c.query("SELECT coalesce(sum(amount_minor),0)::text AS amount FROM portfolio_transactions WHERE user_id=$1 AND type='FUND'",[userId])).rows[0];
   const req=BigInt(row.requested_risk_minor);let reason:string|null=null;
   if(row.emergency_stop||s.emergencyStop)reason='Emergency stop is active';
   else if(row.bot_state!=='RUNNING')reason='Bot is not running';
@@ -250,7 +252,7 @@ export async function reservePaperOrder(userId:string,orderId:string,requestId:s
   else if(s.positionsUsed>=s.maxPositions)reason='Maximum positions reached';
   else if(req>BigInt(s.riskPerTradeMinor))reason='Proposed risk exceeds per-trade limit';
   else if(req>BigInt(s.riskRemainingMinor))reason='Proposed risk exceeds remaining budget';
-  else if(req>BigInt(row.cash_minor)-BigInt(outstanding.amount))reason='Insufficient unreserved paper cash';
+  else if(req>BigInt(row.cash_minor)-BigInt(outstanding.amount)-BigInt(earmarked.amount)-BigInt(funded.amount))reason='Insufficient unreserved paper cash';
   if(reason){await transitionOrder(c,row,'REJECTED',reason);await c.query('UPDATE orders SET reject_reason=$2 WHERE id=$1',[row.id,reason]);await audit(c,userId,'ORDER_REJECTED','Order',row.id,requestId);return {approved:false,reason,orderId,state:row.state};}
   // Count pending reservations as future position slots as well as open positions.
   const pending=(await c.query("SELECT count(*)::int AS n FROM orders o JOIN accounts a ON a.id=o.account_id JOIN risk_reservations r ON r.order_id=o.id WHERE a.user_id=$1 AND r.released_at IS NULL AND o.filled_quantity=0",[userId])).rows[0].n;

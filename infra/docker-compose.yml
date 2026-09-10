@@ -17,9 +17,9 @@ services:
   api-gateway:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: api-gateway}}
     profiles: ["services"]
-    environment: ["NODE_ENV=development", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001", "AUTH_SERVICE_URL=http://auth-service:3002", "TRADING_SERVICE_URL=http://trading-service:3003", "ALLOCATION_SERVICE_URL=http://allocation-service:3005", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    environment: ["NODE_ENV=development", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001", "AUTH_SERVICE_URL=http://auth-service:3002", "TRADING_SERVICE_URL=http://trading-service:3003", "ALLOCATION_SERVICE_URL=http://allocation-service:3005", "PORTFOLIO_SERVICE_URL=http://portfolio-service:3006", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
     ports: ["127.0.0.1:3000:3000"]
-    depends_on: {risk-service: {condition: service_healthy}, auth-service: {condition: service_healthy}, trading-service: {condition: service_healthy}, allocation-service: {condition: service_healthy}}
+    depends_on: {risk-service: {condition: service_healthy}, auth-service: {condition: service_healthy}, trading-service: {condition: service_healthy}, allocation-service: {condition: service_healthy}, portfolio-service: {condition: service_healthy}}
   risk-service:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: risk-service}}
     profiles: ["services"]
@@ -48,6 +48,13 @@ services:
     ports: ["127.0.0.1:3005:3005"]
     depends_on: {postgres: {condition: service_healthy}}
     healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3005/ready"], interval: 5s, timeout: 3s, retries: 10}
+  portfolio-service:
+    build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: portfolio-service}}
+    profiles: ["services"]
+    environment: ["NODE_ENV=development", "PORTFOLIO_PORT=3006", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    ports: ["127.0.0.1:3006:3006"]
+    depends_on: {postgres: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3006/ready"], interval: 5s, timeout: 3s, retries: 10}
 volumes:
   tipkhun-postgres:
   tipkhun-redis:

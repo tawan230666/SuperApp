@@ -79,8 +79,9 @@ export function baseApp(service: string, dependencyReady?:()=>Promise<void>): ex
       credentials: true,
     }),
   );
-  app.use((_req, res, next) => {
-    res.locals.requestId = crypto.randomUUID();
+  app.use((req, res, next) => {
+    const suppliedId=req.header("x-request-id");
+    res.locals.requestId = suppliedId && /^[a-f0-9-]{36}$/i.test(suppliedId) ? suppliedId : crypto.randomUUID();
     res.setHeader("x-request-id", res.locals.requestId);
     res.setHeader("Cache-Control", "no-store");
     next();

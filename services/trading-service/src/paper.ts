@@ -67,7 +67,7 @@ export async function control(userId:string,action:string,requestId:string){
  });
 }
 export async function createOrder(userId:string,input:unknown,key:string,token:string,requestId:string){
- const d=orderSchema.parse(input);if(['profit','profit101','even'].includes(d.scenario)&&process.env.NODE_ENV!=='test'&&process.env.TEST_MODE!=='1')throw new HttpError(400,'Test price scenario is disabled');if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
+ const d=orderSchema.parse(input);if(['profit','profit101','even'].includes(d.scenario)&&(process.env.NODE_ENV==='production'||!['test','development'].includes(process.env.NODE_ENV??'')||process.env.TEST_MODE!=='1'||!new URL(process.env.DATABASE_URL??'postgres://localhost/none').pathname.endsWith('_test')))throw new HttpError(400,'Test price scenario is disabled');if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
  const hash=createHash('sha256').update(JSON.stringify(d)).digest('hex');
  const o=await transaction(async c=>{
   await lockOwner(c,userId);const a=await account(c,userId);if(!a)throw new HttpError(409,'Start paper account first');

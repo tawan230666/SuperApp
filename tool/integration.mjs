@@ -1,3 +1,4 @@
+import {requireFreePorts} from './test-ports.mjs';
 import { existsSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 if (existsSync(".env")) process.loadEnvFile(".env");
@@ -14,6 +15,8 @@ const env = {
   NODE_ENV: "test",
   TEST_MODE: "1",
   RUN_DB_TESTS: "1",
+  PAPER_MARKET_PROVIDER: "deterministic",
+  PORTFOLIO_SERVICE_URL: "http://127.0.0.1:13006",
   RISK_SERVICE_URL: "http://127.0.0.1:13001",
   AUTH_SERVICE_URL: "http://127.0.0.1:13002",
   TRADING_SERVICE_URL: "http://127.0.0.1:13003",
@@ -25,7 +28,10 @@ const migrated = spawnSync(
   { env, stdio: "inherit" },
 );
 if (migrated.status !== 0) process.exit(1);
+await requireFreePorts([13000,13001,13002,13003,13005,13006,13007,13008]);
 const children = [
+  spawn("node",["services/portfolio-service/dist/server.js"],{env:{...env,NODE_ENV:"development",PORTFOLIO_PORT:"13006"},stdio:"inherit"}),
+  spawn("node",["services/api-gateway/dist/server.js"],{env:{...env,NODE_ENV:"development",API_PORT:"13000"},stdio:"inherit"}),
   spawn("node",["services/trading-service/dist/server.js"],{env:{...env,NODE_ENV:"development",TRADING_PORT:"13003"},stdio:"inherit"}),
   spawn("node",["services/auth-service/dist/server.js"],{env:{...env,NODE_ENV:"development",AUTH_PORT:"13002"},stdio:"inherit"}),
   spawn("node", ["services/risk-service/dist/server.js"], {
@@ -36,9 +42,9 @@ const children = [
 ];
 try {
   let healthy = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 150; i++) {
     try {
-      if ((await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok && (await fetch("http://127.0.0.1:13005/ready")).ok) {
+      if ((await fetch("http://127.0.0.1:13006/ready")).ok && (await fetch("http://127.0.0.1:13000/ready")).ok && (await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok && (await fetch("http://127.0.0.1:13005/ready")).ok) {
         healthy = true;
         break;
       }
@@ -54,7 +60,7 @@ try {
       "exec",
       "vitest",
       "run",
-      process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
+      process.argv[2] === "portfolio" ? "src/portfolio.integration.test.ts" : process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
     ],
     { env, stdio: "inherit" },
   );
