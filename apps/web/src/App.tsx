@@ -211,6 +211,14 @@ function Bot() {
     </>
   );
 }
+function ProfitRouter() {
+  const [available,setAvailable]=React.useState<any>(null),[settings,setSettings]=React.useState({shortTermBps:5000,longTermBps:3000,withdrawalBps:2000}),[preview,setPreview]=React.useState<any>(null),[history,setHistory]=React.useState<any[]>([]),[error,setError]=React.useState('');
+  const load=React.useCallback(async()=>{try{const [a,s,h]=await Promise.all([api<any>('/allocations/available'),api<any>('/allocations/settings'),api<any[]>('/allocations/history')]);setAvailable(a);setSettings(s);setHistory(h);}catch(e){setError((e as Error).message);}},[]); React.useEffect(()=>{void load();},[load]);
+  async function save(){try{await api('/allocations/settings',{method:'PUT',body:JSON.stringify(settings)});setError('บันทึกการตั้งค่าแล้ว');}catch(e){setError((e as Error).message);}}
+  async function confirm(){try{await api('/allocations/confirm',{method:'POST',headers:{'Idempotency-Key':`web-${Date.now()}`},body:'{}'});setPreview(null);await load();setError('ยืนยันการจัดสรรแล้ว');}catch(e){setError((e as Error).message);}}
+  if(!available)return <p role="status">กำลังโหลด Profit Router…</p>;
+  return <><div className="page-title"><div><span className="eyebrow">PAPER / LEDGER</span><h2>Profit Router</h2><p>Realized net profit only · PAPER / SIMULATION</p></div></div>{error&&<p role="status">{error}</p>}<section className="metrics"><Metric label="Available realized profit" value={available.availableMinor}/><Metric label="Mode" value="PAPER"/></section><Panel title="Allocation settings"><div className="status-row">{(['shortTermBps','longTermBps','withdrawalBps'] as const).map(k=><label key={k}>{k}<input type="number" value={settings[k]} onChange={e=>setSettings({...settings,[k]:Number(e.target.value)})}/></label>)}<button className="button secondary" onClick={save}>SAVE</button></div><p>สัดส่วนต้องรวม 10000 bps</p></Panel><Panel title="Preview"><button className="button primary" onClick={async()=>setPreview(await api('/allocations/preview',{method:'POST',body:'{}'}))}>PREVIEW</button>{preview&&<><pre>{JSON.stringify(preview,null,2)}</pre><button className="button primary" onClick={confirm}>CONFIRM</button></>}</Panel><Panel title="Allocation history">{history.length?history.map(h=><p key={h.id}>{h.created_at}: {h.amount_minor} minor units</p>):<Empty>ยังไม่มี allocation</Empty>}</Panel></>;
+}
 function Trades() {
   return (
     <>
@@ -338,12 +346,7 @@ function ProtectedApp() {
         <Route path="/risk" element={<RiskSettings />} />
         <Route
           path="/profit-router"
-          element={
-            <Placeholder
-              title="Profit Router"
-              description="ยังไม่มี realized net profit ที่จัดสรรได้"
-            />
-          }
+          element={<ProfitRouter />}
         />
         <Route
           path="/long-term"
