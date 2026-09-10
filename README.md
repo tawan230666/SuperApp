@@ -1,68 +1,119 @@
-# Tipkhun Capital · Beta
+# Tipkhun Capital
 
-Flutter app for risk planning, a trade journal, and profit allocation. Continues the existing `superapp` project and package identifiers. Uses the original Tipkhun artwork, a rebuilt task-first workspace with charcoal navigation, a live risk gauge, restrained sage accents, and responsive page layouts, and bundled Noto Sans Thai typography.
+แอปวางแผนความเสี่ยง บันทึกเทรด จัดสรรกำไร และทดลอง Paper Trading จาก **Flutter codebase เดียวสำหรับ Android, iOS และ Web** ไม่มีเงินจริงหรือการรับประกันผลตอบแทน
 
 ## Run
 
 ```sh
 flutter pub get
-flutter run -d chrome
-# Or select a connected Android/iOS device:
 flutter devices
-flutter run
+flutter run -d chrome       # Web
+flutter run -d DEVICE_ID    # Android / iOS ที่ตั้งค่า toolchain แล้ว
 ```
 
-## Implemented
-
-- Five connected pages: overview, trade journal, profit router, long term, assistant.
-- Daily dashboard: capital, net P/L after fees, remaining risk, trade count, daily loss limit, target, risk level and three progress bars.
-- Low / Medium / High presets and Custom plan; money/percentage validation; Daily / Weekly / Monthly allocation preference.
-- Trade asset, gross P/L, fees, local date/time, note and optional strategy. Today / 7 Days / 30 Days / All filters.
-- Deterministic risk calculations in integer satang. Real trades can still be recorded after STOP, with a discipline violation. Backdated records are replayed chronologically.
-- Editable allocation ratios totaling 100%, confirmation preview, rounding-safe allocation history and duplicate-profit prevention.
-- Thirty-day risk history, total risk used, maximum daily cumulative loss and discipline score.
-- Provider-independent assistant service with local rule-based answers from plan data; chat loading and error states.
-- Persistent local data, loading/error/disabled states, responsive navigation, Beta/About and Settings > Legal & Risk Disclosure.
-
-## Architecture
-
-- `lib/main.dart`: responsive shell, navigation and journal/allocation/assistant flows.
-- `lib/ui/dashboard.dart`: risk-first overview, quick actions, next steps, recent activity and discipline history.
-- `lib/ui/workspace_widgets.dart`: shared visual system and accessible data-driven risk gauge.
-- `lib/ui/plan_forms.dart`: validated input dialogs.
-- `lib/state/plan_store.dart`: load/save state, publishes mutations only after successful persistence.
-- `lib/domain/investment_plan.dart`: risk engine, journal, allocations, serialization and history.
-- `lib/data/plan_repository.dart`: repository interface and shared-preferences storage.
-- `lib/services/assistant_service.dart`: replaceable assistant interface and deterministic local implementation.
-- `lib/ui/brand_mark.dart`: framing for the original supplied artwork; native/web icons use the same mark.
-- `assets/fonts/`: bundled Noto Sans Thai and OFL license for offline typography.
-- `tool/render_brand_test.dart`: regenerate platform icons and mobile/desktop previews for all five pages with `flutter test tool/render_brand_test.dart`.
-- `docs/previews/`: rendered previews at 320px, 390px and 1440px.
-
-## Calculation policy
-
-Money is stored in satang and daily risk percentage in basis points. Daily risk used is the sum of negative net trade outcomes; winning trades never refill that budget. Risk and loss-limit consumption are separate displays. Loss-limit or risk-budget exhaustion takes precedence over a profit target. Reaching a target latches the stop for that local day, even if a later trade loses. Maximum trades and insufficient remaining risk also stop the plan.
-
-The daily view resets at local midnight; records and allocations persist. Profit available for allocation is lifetime net P/L minus previously allocated profit, floored at zero. This preserves the original protection against allocating the same profit twice or ignoring later losses. The chosen allocation cycle is a planning preference; allocations require manual confirmation and are not automatic transfers or scheduled jobs.
-
-Discipline score = trades without a violation / all trades that day × 100 (rounded). A violation is a trade after a stop condition or a net loss exceeding the per-trade risk allowance. Days without trades have no score. It measures compliance with this recorded plan, not investment skill. Risk History shows maximum cumulative loss per day, not intraday equity drawdown.
-
-## Placeholders and limitations
-
-- AI Long-Term Analysis is COMING SOON. No fabricated market quotes, asset scores or portfolio recommendations.
-- Assistant uses local rules, not a connected AI API. Chat messages last for the current app session.
-- No real-money transfers, broker connection, cloud sync or backup. Clearing app/browser data or uninstalling removes local records. Shared preferences is suitable for this beta journal, not a financial ledger or encrypted vault.
-- The original plan lock after the first trade is retained to keep historical risk criteria stable. Plan versioning/editing after trading is a future extension. Allocation percentages remain editable.
-- Initial ฿350 plan is editable before the first trade and contains no fabricated trade history.
-- Reload tests use the repository with mocked platform preferences. Device restart and native iOS/macOS/Windows builds still need device-specific validation.
-
-## Checks
+## Verify and build
 
 ```sh
-dart format lib test
+dart format .
 flutter analyze
 flutter test
 flutter build web
+# ภาพ review จาก Flutter renderer (ไม่ใช่ browser screenshot)
+flutter test tool/render_web_test.dart
 ```
 
-Tests cover existing risk rules, daily rollover, fees, backdating, discipline, rounding, persistence/reload, corrupt data, failed saves, and all five pages at 320px, 390px and desktop navigation.
+Release Web อยู่ที่ `build/web`. วิธี preview, hosting, Free Tier และ smoke checklist อยู่ใน [WEB_DEPLOYMENT.md](docs/WEB_DEPLOYMENT.md). ยังไม่ได้ deploy หรือเปิด billing
+
+หาก environment จำกัด telemetry ใช้ prefix `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true` กับคำสั่ง Flutter/Dart
+
+## Web navigation and responsive design
+
+Flutter Router API, default hash URLs สำหรับ refresh บน static hosting:
+
+- `/#/dashboard` (หรือ `/`)
+- `/#/trades`
+- `/#/profit-router`
+- `/#/long-term`
+- `/#/assistant`
+- `/#/bot`
+- `/#/bot/strategies`
+- `/#/bot/backtest`
+- `/#/risk-analytics`
+- `/#/settings`
+
+Mobile <600px, Tablet 600–1023px, Desktop ≥1024px. Mobile/Tablet คง Bottom Navigation 5 เมนู; Desktop มี Sidebar, account/mode/connection status และ notification/profile information. เนื้อหามี max width และ grid ไม่ยืด card เต็มจอกว้าง 1920px
+
+Desktop journal มีตารางแบบแบ่งหน้า, search, asset/strategy/date filters และ Export CSV ผ่าน preview/copy clipboard พร้อมป้องกันสูตร spreadsheet. Side/Entry/Exit ที่ไม่มีในโมเดลเดิมแสดง —. Mobile ใช้ cards จากข้อมูลเดียวกัน
+
+กราฟ Recorded Equity, Daily P&L, Drawdown และ Allocation ใช้ข้อมูลบันทึกและสูตรเดียวกับ Mobile; ไม่มีข้อมูลจะแสดง Empty State. Recorded Equity ไม่ใช่ยอดโบรกเกอร์หรือมูลค่าตลาด
+
+## Current features
+
+- Daily Risk Engine ใช้ integer satang / basis points; ขาดทุนสะสมใช้ risk budget โดยกำไรไม่เติมกลับ
+- Journal พร้อม fees, backdating, notes, strategy และ discipline replay
+- Profit Router preview/confirmation, rounding และป้องกันจัดสรรกำไรซ้ำ
+- 30-day risk history, discipline score, responsive charts
+- Paper Bot: Start/Pause/Stop, confirmed Emergency Stop, risk reservation, idempotency, order status, reconciliation และ audit events
+- Read-only Copilot: reuse AssistantService, local rule-based plan summary และ paper status; แจ้งว่าไม่มี Strategy/Backtest ที่ยังไม่เกิดขึ้น
+- Long-term cash allocation/history; holdings, market value, research และ AI Analysis ยัง Coming Soon
+- ใช้โลโก้ต้นฉบับ T ที่กู้จากประวัติ GitHub รวม platform icons
+
+## Paper / AI status
+
+Broker เป็น **local synthetic Mock** ของ SYNTHETIC-THB. Full notional risk, long-only, หนึ่ง open position, ไม่มี leverage. ราคาเปิด/ปิดเท่ากันในตัวจำลอง; fees/spread สมมติเป็น 0 และระบุชัด ไม่มีตลาดสดหรือกลยุทธ์อัตโนมัติ
+
+PaperSession อยู่ระดับ workspace เพื่อไม่สร้าง engine ใหม่เมื่อสลับหน้า. Refresh โหลด snapshot แล้ว pause; reconcile ก่อนจัดการ position เดิม. Unknown outcome เก็บ reservation และไม่ส่งซ้ำ. Emergency Stop คง position ให้ตรวจ/ปิดเอง ไม่รับประกัน liquidation
+
+AI Agent panel แสดง OFFLINE ตามจริง ไม่มี LLM API, research run, strategy promotion หรือ backtest. Chat ใช้กฎภายใน ไม่อ้าง confidence หรือราคาตลาด
+
+## Architecture and structure
+
+- `lib/navigation/app_router.dart`: URL parsing / navigation state
+- `lib/ui/app_shell.dart`: shared shell, breakpoints, responsive page container
+- `lib/ui/dashboard.dart`, `web_panels.dart`: dashboard, chart/grid, risk analytics, honest agent/research placeholders
+- `lib/ui/trade_table.dart`: shared filters, paginated desktop journal, escaped CSV
+- `lib/ui/bot_dashboard.dart`: responsive paper controls and confirmation
+- `lib/main.dart`: shared application flows, plan/journal/allocation/chat
+- `lib/domain/investment_plan.dart`: existing deterministic accounting and journal logic, unchanged in Web milestone
+- `lib/trading/paper_engine.dart`: synthetic execution gateway, unchanged in Web milestone
+- `lib/state/plan_store.dart`, `paper_session.dart`: state and persistence boundaries
+- `lib/data/plan_repository.dart`, `paper_repository.dart`: replaceable storage interfaces and local adapters
+- `lib/services/assistant_service.dart`: read-only rule-based provider
+- `test/`: regression, domain, persistence, routing, CSV, responsive/widget tests
+- `tool/render_web_test.dart`: reproducible visual review; output `docs/previews/web/`
+
+Future shared architecture: Mobile/Web → authenticated API → server-side risk/orchestrator/AI/broker → durable DB/ledger/audit. Flutter is client only. Do not put broker credentials, AI keys or DB passwords in Flutter, assets, dart-define or SharedPreferences
+
+## Data and limitations
+
+Existing `tipkhun.plan.v1` and `tipkhun.paper.synthetic.v1` keys/schema remain unchanged. No reset or migration. Paper profits are not copied into manual allocations. Profit reserved for withdrawal is not withdrawn cash. Allocation ratios remain editable; plan locks after first manual trade pending Plan Versioning
+
+SharedPreferences is local prototype storage, not a transactional ledger, encrypted vault, cross-device backup or multi-tab coordinator. Use one Paper tab. Clearing browser data/uninstalling loses local records; changing origin uses different storage. Journal days use device-local timezone; Paper accounting days use Bangkok/UTC storage
+
+No production auth, payments, cloud sync, worker, official broker, market feed, live mode, double-entry ledger or strategy sandbox. No offline guarantee. Chat history is session-only
+
+## Validation and Git
+
+2026-09-09: baseline 33 tests passed; final responsive Web suite 45 tests passed; optional visual renderer test passed (1 test). See [PROGRESS](docs/PROGRESS.md) for final results. Native iOS build unavailable: incomplete Xcode and missing CocoaPods. Chrome launch failed in this managed environment, so browser refresh/back/forward and actual device E2E still require smoke testing before release
+
+Source initially had no `.git`. Checkpoint `04cc5e3` was pushed to `feature/web-platform` without rewriting main. Managed workspace `.git` is read-only; commit/push uses a separate checkout. See [GIT_WORKFLOW](docs/GIT_WORKFLOW.md) for reconnecting source metadata safely
+
+[Architecture](docs/ARCHITECTURE.md) · [Decisions](docs/DECISIONS.md) · [Next Steps](docs/NEXT_STEPS.md)
+
+## Repository policy
+
+`tawan230666/SuperApp` is the shared Tipkhun Capital Mobile + Web repository. Business logic, data models, risk, AI interfaces and branding stay shared. Future API/server code belongs in `backend/` when implemented. Web work stays on `feature/web-platform`; trading-bot, ai-agent and backend branches can be created when those tasks begin. Merge into main after validation.
+
+A future corporate/marketing website may have its own repository; no separate Web App repository or GitHub Project is needed now. Domain examples are planning only, not purchased or deployed sites.
+
+## Monorepo foundation
+
+The repository now also contains the staged platform foundation:
+
+- `apps/web`: React + TypeScript + Vite FinTech dashboard
+- `packages/contracts`, `packages/validation`, `packages/shared`: shared API schemas and event contracts
+- `services/`: Express service boundaries, with API Gateway and deterministic Risk Service available locally
+- `database/migrations`: additive PostgreSQL schema using UUIDs, UTC timestamps and minor-unit money
+- `infra/docker-compose.yml`: local PostgreSQL and Redis, with optional service containers
+
+Run the TypeScript workspace with `pnpm install`, `pnpm test`, `pnpm build`, or `pnpm lint`. Start local infrastructure with `docker compose -f infra/docker-compose.yml up -d`. The new services are development scaffolding and Paper/Simulation only; the Flutter app remains the source of existing local business behavior until each repository is migrated and regression-tested.

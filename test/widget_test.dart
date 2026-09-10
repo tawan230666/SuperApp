@@ -40,7 +40,7 @@ void main() {
     expect(find.byType(NavigationRail), findsOneWidget);
     await tester.tap(find.text('แบ่งกำไร').first);
     await tester.pumpAndSettle();
-    expect(find.text('ให้กำไรเดินทางต่อ'), findsOneWidget);
+    expect(find.text('กำไรพร้อมจัดสรร'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -82,6 +82,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('฿12.50'), findsOneWidget);
     await tester.tap(find.widgetWithText(QuickAction, 'ทบทวนแผน'));
+    await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(
+      tester.element(find.text('วันนี้เหลืองบความเสี่ยงเท่าไร?')),
+      alignment: 0.5,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('วันนี้เหลืองบความเสี่ยงเท่าไร?'));
     await tester.pumpAndSettle();

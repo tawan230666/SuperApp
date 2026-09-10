@@ -1,20 +1,15 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-const ink = Color(0xFF242E2B), green = Color(0xFF286451);
-const canvas = Color(0xFFF0F1ED), muted = Color(0xFF647068);
-const mint = Color(0xFFE4EBE1), border = Color(0xFFE0E3DB);
-const surface = Color(0xFFFCFCF9), forest = Color(0xFF193C31);
-const accent = Color(0xFF957345), railText = Color(0xFFC0C9C2);
-const charcoal = Color(0xFF202C27), lime = Color(0xFFD2E7A7);
-const negative = Color(0xFFAA5149);
+import 'design_tokens.dart';
+export 'design_tokens.dart';
 
 class WorkspaceCard extends StatelessWidget {
   const WorkspaceCard({
     super.key,
     required this.child,
     this.color = surface,
-    this.padding = 24,
+    this.padding = CapitalSpace.lg,
   });
   final Widget child;
   final Color color;
@@ -25,7 +20,23 @@ class WorkspaceCard extends StatelessWidget {
     padding: EdgeInsets.all(padding),
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(20),
+      gradient: color == charcoal
+          ? const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [forest, charcoal],
+            )
+          : null,
+      boxShadow: color == surface
+          ? [
+              BoxShadow(
+                color: ink.withValues(alpha: .025),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ]
+          : null,
       border: Border.all(color: color == surface ? border : color),
     ),
     child: Material(type: MaterialType.transparency, child: child),
@@ -82,6 +93,7 @@ class Amount extends StatelessWidget {
     child: Text(
       value,
       style: TextStyle(
+        fontFeatures: const [FontFeature.tabularFigures()],
         fontSize: size,
         fontWeight: FontWeight.w600,
         letterSpacing: -1,
@@ -220,7 +232,7 @@ class _GaugePainter extends CustomPainter {
 class EmptyJournal extends StatelessWidget {
   const EmptyJournal({
     super.key,
-    this.title = 'บันทึกเล็ก ๆ เพื่อการตัดสินใจที่ดีขึ้น',
+    this.title = 'ยังไม่มีรายการเทรด',
     this.description =
         'รายการเทรดของคุณจะปรากฏที่นี่\nเริ่มบันทึกเพื่อทบทวนผลลัพธ์และวินัยในแต่ละวัน',
   });
@@ -230,29 +242,7 @@ class EmptyJournal extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 20),
     child: Column(
       children: [
-        Transform.rotate(
-          angle: -.08,
-          child: Container(
-            width: 100,
-            height: 82,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEDF0E6),
-              border: Border.all(color: border),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.receipt_long_outlined, color: green, size: 22),
-                const SizedBox(height: 9),
-                Container(height: 3, width: 55, color: const Color(0xFFC2CCBA)),
-                const SizedBox(height: 6),
-                Container(height: 3, width: 36, color: const Color(0xFFD5DCCF)),
-              ],
-            ),
-          ),
-        ),
+        const IconBadge(Icons.receipt_long_outlined, size: 64),
         const SizedBox(height: 22),
         Text(
           title,
@@ -276,13 +266,15 @@ class QuickAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.primary = false,
   });
+  final bool primary;
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Material(
-    color: surface,
+    color: primary ? green : surface,
     borderRadius: BorderRadius.circular(18),
     child: InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -291,18 +283,241 @@ class QuickAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 16),
         child: Column(
           children: [
-            Icon(icon, size: 23, color: onTap == null ? muted : green),
+            Icon(
+              icon,
+              size: 23,
+              color: onTap == null
+                  ? muted
+                  : primary
+                  ? Colors.white
+                  : green,
+            ),
             const SizedBox(height: 10),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: onTap == null ? muted : ink,
+                color: onTap == null
+                    ? muted
+                    : primary
+                    ? Colors.white
+                    : ink,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Responsive metrics preserve reading order on compact screens.
+class MetricGrid extends StatelessWidget {
+  const MetricGrid({super.key, required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final columns = c.maxWidth >= 700 ? children.length : 2;
+      final width = (c.maxWidth - 12 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
+  );
+}
+
+class MetricCard extends StatelessWidget {
+  const MetricCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.detail,
+    this.valueColor = ink,
+  });
+  final String label, value;
+  final String? detail;
+  final IconData icon;
+  final Color valueColor;
+  @override
+  Widget build(BuildContext context) => WorkspaceCard(
+    padding: 16,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: muted),
+        const SizedBox(height: 12),
+        Text(label, style: const TextStyle(color: muted, fontSize: 12)),
+        const SizedBox(height: 6),
+        Amount(value, size: 26, color: valueColor),
+        if (detail != null) ...[
+          const SizedBox(height: 4),
+          Text(detail!, style: const TextStyle(fontSize: 11, color: muted)),
+        ],
+      ],
+    ),
+  );
+}
+
+class Notice extends StatelessWidget {
+  const Notice(
+    this.message, {
+    super.key,
+    this.warning = false,
+    this.icon = Icons.info_outline,
+  });
+  final String message;
+  final bool warning;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: warning ? const Color(0xFFFFF1EA) : mint,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: warning ? negative : green, size: 19),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(
+              fontSize: 12,
+              color: warning ? negative : forest,
+              height: 1.6,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class FormSection extends StatelessWidget {
+  const FormSection(this.number, this.title, this.description, {super.key});
+  final String number, title, description;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 20),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: mint,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: green,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class AllocationBar extends StatelessWidget {
+  const AllocationBar({super.key, required this.values});
+  final List<int> values;
+  static const colors = [green, Color(0xFF76B8A6), accent];
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label:
+        'สัดส่วนระยะสั้น ${values[0]} เปอร์เซ็นต์ ระยะยาว ${values[1]} เปอร์เซ็นต์ ถอน ${values[2]} เปอร์เซ็นต์',
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          for (var i = 0; i < values.length; i++)
+            if (values[i] > 0)
+              Expanded(
+                flex: values[i],
+                child: Container(height: 12, color: colors[i]),
+              ),
+        ],
+      ),
+    ),
+  );
+}
+
+class WorkspaceState extends StatelessWidget {
+  const WorkspaceState({
+    super.key,
+    required this.title,
+    required this.message,
+    this.loading = false,
+    this.onRetry,
+  });
+  final String title, message;
+  final bool loading;
+  final VoidCallback? onRetry;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: WorkspaceCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading)
+                const CircularProgressIndicator()
+              else
+                const IconBadge(Icons.cloud_off_outlined, size: 56),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: muted),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('ลองใหม่'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     ),

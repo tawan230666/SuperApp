@@ -20,99 +20,103 @@ class Dashboard extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final desktop = constraints.maxWidth >= 820;
-      final left = Column(
+      final actions = Row(
         children: [
-          _balance(),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.add_rounded,
-                  label: 'บันทึกเทรด',
-                  onTap: saving ? null : onRecord,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.call_split_rounded,
-                  label: 'จัดสรรกำไร',
-                  onTap: () => onNavigate(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'ทบทวนแผน',
-                  onTap: () => onNavigate(4),
-                ),
-              ),
-            ],
+          Expanded(
+            child: QuickAction(
+              icon: Icons.add_rounded,
+              label: 'บันทึกเทรด',
+              primary: true,
+              onTap: saving ? null : onRecord,
+            ),
           ),
-          const SizedBox(height: 26),
-          _recent(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: QuickAction(
+              icon: Icons.call_split_rounded,
+              label: 'จัดสรรกำไร',
+              onTap: () => onNavigate(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: QuickAction(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'ทบทวนแผน',
+              onTap: () => onNavigate(4),
+            ),
+          ),
         ],
       );
-      final right = Column(
-        children: [
-          _today(),
-          const SizedBox(height: 18),
-          _nextStep(),
-          const SizedBox(height: 18),
-          _discipline(),
-        ],
-      );
-      if (desktop) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 7, child: left),
-            const SizedBox(width: 28),
-            Expanded(flex: 5, child: right),
-          ],
-        );
-      }
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _balance(),
-          const SizedBox(height: 14),
-          Row(
+          if (desktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: _balance()),
+                const SizedBox(width: 20),
+                Expanded(flex: 5, child: _today()),
+              ],
+            )
+          else
+            _balance(),
+          const SizedBox(height: 16),
+          actions,
+          const SizedBox(height: 24),
+          MetricGrid(
             children: [
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.add_rounded,
-                  label: 'บันทึกเทรด',
-                  onTap: saving ? null : onRecord,
-                ),
+              MetricCard(
+                label: 'เงินตั้งต้น',
+                value: money(plan.capital),
+                icon: Icons.account_balance_wallet_outlined,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.call_split_rounded,
-                  label: 'จัดสรรกำไร',
-                  onTap: () => onNavigate(2),
-                ),
+              MetricCard(
+                label: 'กำไร / ขาดทุนวันนี้',
+                value: money(plan.pnl),
+                icon: Icons.show_chart_rounded,
+                valueColor: plan.pnl < 0 ? negative : green,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: QuickAction(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'ทบทวนแผน',
-                  onTap: () => onNavigate(4),
-                ),
+              MetricCard(
+                label: 'เป้าหมายกำไร',
+                value: money(plan.target),
+                icon: Icons.flag_outlined,
+              ),
+              MetricCard(
+                label: 'เทรดวันนี้',
+                value: '${plan.today.length} / ${plan.maxTrades}',
+                icon: Icons.receipt_long_outlined,
               ),
             ],
           ),
           const SizedBox(height: 24),
-          _today(),
-          const SizedBox(height: 20),
-          _nextStep(),
-          const SizedBox(height: 24),
-          _recent(),
-          const SizedBox(height: 20),
-          _discipline(),
+          if (!desktop) ...[_today(), const SizedBox(height: 20)],
+          if (desktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: _recent()),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    children: [
+                      _nextStep(),
+                      const SizedBox(height: 20),
+                      _discipline(),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _nextStep(),
+            const SizedBox(height: 20),
+            _recent(),
+            const SizedBox(height: 20),
+            _discipline(),
+          ],
         ],
       );
     },
@@ -175,22 +179,19 @@ class Dashboard extends StatelessWidget {
         const Divider(color: Color(0xFF425047), height: 1),
         const SizedBox(height: 18),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Icon(Icons.shield_outlined, color: lime, size: 18),
+            const SizedBox(width: 10),
             Expanded(
-              child: _smallStat(
-                'เงินตั้งต้น',
-                money(plan.capital),
-                Colors.white,
+              child: Text(
+                plan.stopReason ?? 'พร้อมบันทึกผลภายใต้งบความเสี่ยงของคุณ',
+                style: const TextStyle(color: railText, fontSize: 12),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _smallStat(
-                'กำไร / ขาดทุนวันนี้',
-                money(plan.pnl),
-                plan.pnl < 0 ? const Color(0xFFFFB5AA) : lime,
-              ),
+            IconButton(
+              onPressed: saving ? null : onConfigure,
+              tooltip: 'รายละเอียดแผน',
+              icon: const Icon(Icons.tune_rounded, color: lime, size: 20),
             ),
           ],
         ),
@@ -198,21 +199,12 @@ class Dashboard extends StatelessWidget {
     ),
   );
 
-  Widget _smallStat(String label, String value, Color color) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: railText)),
-      const SizedBox(height: 5),
-      Amount(value, size: 22, color: color),
-    ],
-  );
-
   Widget _today() => WorkspaceCard(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionTitle(
-          'ขอบเขตของวันนี้',
+          'แผนประจำวัน',
           subtitle: 'รู้จุดหยุด ก่อนเริ่มเทรด',
           action: const IconBadge(Icons.tune_rounded, size: 36),
         ),
@@ -272,9 +264,16 @@ class Dashboard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '${money(used)} / ${money(max)}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            Flexible(
+              flex: 2,
+              child: Text(
+                '${money(used)} / ${money(max)}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -291,7 +290,7 @@ class Dashboard extends StatelessWidget {
   );
 
   Widget _nextStep() => WorkspaceCard(
-    color: const Color(0xFFE6EAD9),
+    color: mint,
     padding: 20,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +301,7 @@ class Dashboard extends StatelessWidget {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                'ก้าวต่อไปของคุณ',
+                'การดำเนินการถัดไป',
                 style: TextStyle(
                   fontSize: 12,
                   color: green,
@@ -357,7 +356,7 @@ class Dashboard extends StatelessWidget {
       children: [
         SectionTitle(
           'กิจกรรมล่าสุด',
-          subtitle: 'ทุกบันทึก คือข้อมูลสำหรับวันต่อไป',
+          subtitle: 'ผลเทรดล่าสุดจากบันทึกของคุณ',
           action: IconButton(
             tooltip: 'ดูบันทึกทั้งหมด',
             onPressed: () => onNavigate(1),
