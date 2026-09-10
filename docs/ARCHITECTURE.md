@@ -37,3 +37,26 @@ Original T artwork was recovered from remote main and restored, replacing previo
 The repository now has a pnpm workspace with `apps/web` (React + TypeScript + Vite), a guarded `apps/mobile` migration boundary, `packages/contracts`, `packages/validation`, `packages/shared`, Node/Express service boundaries under `services/`, SQL under `database/migrations`, and local dependencies under `infra/`.
 
 The React app is a new Web client and does not duplicate Flutter business calculations: its empty dashboard explicitly waits for API data. The gateway and risk service use shared runtime schemas. The TypeScript risk gate mirrors the current conservative client rules and is tested independently; it is not yet authoritative for users because auth, persistence and tenant isolation are not enabled.
+
+## Phase 2 implementation — 2026-09-10
+
+React -> Gateway authentication -> owner-scoped risk/plan persistence ->
+Risk Service authentication -> DB snapshot -> deterministic planning decision.
+`packages/database` owns pg pooling/transactions; `packages/auth` shares the
+session and auth route implementation between Auth Service and Gateway;
+`packages/risk-data` owns plan/profile queries and authoritative planning checks.
+Gateway mounts the shared auth implementation directly (not a network proxy to
+Auth Service). All three use the same PostgreSQL database.
+
+Web AuthProvider refreshes a cookie session, loads /me, protects routes, and
+connects Dashboard/Risk settings to real API requests. Missing plan shows first
+plan onboarding, never a fake financial snapshot. Profile and plan saves are
+separate transactions; if the second fails the profile may already be saved.
+The UI reports failure and preserves form inputs; cross-resource atomic save is
+PARTIAL. Preview includes all proposed fields and a high daily-risk warning.
+
+Flutter keeps its existing local model and storage. New interfaces and remote
+adapters live under lib/data/remote with PLATFORM_REPOSITORY=local|remote;
+transport and secure token storage are not wired. Default remains local.
+Redis is provisioned but not used as a dependency by the implemented services.
+No backend worker writes orders/trades; no broker, market feed or AI integration.

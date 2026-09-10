@@ -104,3 +104,38 @@ Added a pnpm workspace with `apps/web` (React, TypeScript, Vite, responsive Tipk
 Added PostgreSQL additive migrations with UUID/timestamptz and integer minor-unit money, Redis/Postgres Docker Compose, local environment template, and security/architecture/API/database/migration/development/deployment documentation. No production credentials, broker integration, live order route, or real-money action was added. Flutter domain and persistence code were not moved or deleted.
 
 Validation in the workspace: `pnpm test` passed **9 tests** across contracts, risk, gateway and React (remaining scaffolds use explicit pass-with-no-tests); `pnpm build` passed for all TypeScript packages and React Vite (`dist` generated successfully); `pnpm lint` passed; `flutter analyze --no-pub` passed; `flutter test --no-pub` passed **48 tests**; `docker compose -f infra/docker-compose.yml config` passed. `flutter build web --no-pub` remains green from the prior milestone. Browser Chrome smoke testing and native iOS build remain environment gates.
+
+## Phase 2 — 2026-09-10 — PARTIAL, database acceptance blocked
+
+| Area | Status | Evidence / limit |
+| --- | --- | --- |
+| pg pool, transaction, migration/status/seed commands | IMPLEMENTED | Real PostgreSQL code, no memory persistence fallback; runtime validation blocked |
+| Auth, rotation, revocation, ownership, audits | IMPLEMENTED | Code and DB integration suite; end-to-end DB execution unverified |
+| Profile, immutable plan versions, authoritative planning check | IMPLEMENTED | Server queries owned DB state with BigInt; not an execution authorization |
+| React Login/Register, protected pages, Dashboard, Risk preview | IMPLEMENTED | Component tests pass with mocked HTTP; real browser/backend flow unverified |
+| Flutter migration | PARTIAL | Interfaces/adapters and local/remote flag only; existing app stays local |
+| Full Phase 2 acceptance | PARTIAL | PostgreSQL integration cannot run in current environment |
+| Existing Flutter Paper broker and synthetic data | MOCK | Preserved local behavior; no remote trade ingestion |
+| Backend trading/portfolio/allocation and AI services | PARTIAL | Existing nonfunctional scaffolds retained |
+| Live trading, real brokers, paid AI, payments, production | LOCKED | No connection or deployment performed |
+
+Validation: pnpm build and lint pass. pnpm test passes 25 tests (11 contracts,
+7 React, 4 legacy risk, 3 Gateway); **27 DB integration tests skipped** in that
+command. Separate pnpm test:integration was attempted and fails at database
+connectivity before executing cases. Flutter analyze --no-pub passes and Flutter
+test --no-pub passes all **48** original tests. Compose config validation passes;
+Docker service startup and image builds are not verified. Total executed/passing
+tests: **73**, excluding the 27 integration cases. Do not claim all tests pass.
+
+Environment evidence: Docker daemon unreachable, Docker app launch fails;
+standalone PostgreSQL 16 initdb in a separate temporary directory fails with
+`could not create shared memory segment: Operation not permitted`. No existing
+DB was reset or deleted. The test harness requires an explicit `_test` database,
+uses randomized identities and preserves records.
+
+Source workspace has no .git (same condition documented in GIT_WORKFLOW.md).
+Remote was fetched in `/private/tmp/tipkhun-phase2-checkout` on
+feature/platform-architecture at 2fec65f; existing tracked source matched before
+changes. Publishing uses that safe checkout. No main edit, reset or force push.
+This checkpoint is implementation work with an open acceptance blocker, not a
+completed Phase 2 release.

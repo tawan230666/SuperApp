@@ -27,3 +27,11 @@ git remote -v
 ```
 
 This metadata step has NOT been run by the agent. If `/private/tmp` was cleared, clone GitHub into another directory and compare before reconnecting; never clone over the current app. Final branch is the durable checkpoint. Merge into main after browser review; no production deploy is configured.
+
+## Phase 2 checkout — 2026-09-10
+
+Current safe checkout: `/private/tmp/tipkhun-phase2-checkout`, branch
+`feature/platform-architecture`, starting remote head `2fec65f`. The source
+workspace still has no .git. Updated source is copied additively into this
+checkout for ordinary commits/pushes; remote history and main are preserved.
+The implementation checkpoint explicitly records blocked PostgreSQL acceptance.

@@ -16,3 +16,23 @@
 2. Reconnect root Git metadata using GIT_WORKFLOW.md from a terminal allowed to write .git; feature/web-platform is the durable source on GitHub. Review before main merge.
 3. Add durable backend/account API, versioned plans and ledger before extending client mock to external paper APIs. Implement multi-tab coordination or make the backend the sole executor.
 4. Select hosting after owner approval; no production deploy, domain or billing is configured. Free-tier terms must be rechecked at release.
+
+## Immediate next milestone: finish Phase 2 acceptance
+
+1. Make a dedicated PostgreSQL test database reachable (Docker Desktop in a
+   normal user environment, or provide TEST_DATABASE_URL for an existing test
+   instance). Never reset existing data. Run migrations twice and the 27-case
+   `pnpm test:integration` suite; fix any failures before claiming acceptance.
+2. Verify the real React browser flow: register/login, profile, first plan,
+   snapshot/check, next plan version and logout/reload, including HttpOnly cookie
+   rotation. Existing component tests mock HTTP and cannot prove this flow.
+3. Verify Docker image build and all dependency readiness failures. Add CI with
+   PostgreSQL services so DB tests cannot be silently omitted from acceptance.
+4. Add atomic profile+plan save and cross-tab refresh coordination; wire Flutter
+   transport/OS secure storage only behind the existing local/remote boundary.
+5. For the later remote Paper milestone, design authoritative transactional
+   order reservation, idempotency and settlement. Current RiskDecision explicitly
+   cannot authorize execution and remote trades/positions are not being ingested.
+
+Live trading, real-money brokers, production AI, payment/withdrawal and production
+deployment remain LOCKED. Do not advance to them to bypass Phase 2 validation.

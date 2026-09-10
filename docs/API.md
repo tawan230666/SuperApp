@@ -16,3 +16,49 @@ Risk check uses minor units rather than floating point:
 ```
 
 `RiskDecision` returns `approved`, `reason`, non-negative `riskRemainingMinor`, `tradesRemaining`, and `status`. It cannot be overridden by AI or a client supplied role. Add authentication, tenant scope and audit middleware before exposing this beyond local development.
+
+## Phase 2 API (implementation; PostgreSQL integration not yet verified)
+
+Gateway `http://localhost:3000`; auth `:3002`; risk `:3001`. JSON only.
+Remote money fields are **decimal strings**, for example `"35000"`, not floats.
+
+| Method | Gateway path | Behavior |
+| --- | --- | --- |
+| POST | /api/v1/auth/register | `{email,password}`; 201 only after committed user/account/audit |
+| POST | /api/v1/auth/login | Access + refresh session; invalid credentials 401 |
+| POST | /api/v1/auth/refresh | Rotate refresh; old token replay revokes session |
+| POST | /api/v1/auth/logout | Bearer required; revoke session, return 204 |
+| GET | /api/v1/auth/me, /api/v1/me | Authenticated identity, no hash |
+| GET/PUT | /api/v1/risk/profile | Owned profile; GET null if absent |
+| POST | /api/v1/plans | Create first plan; conflict 409 if present |
+| GET/PUT | /api/v1/plans/current | GET null if absent; PUT creates next immutable version |
+| GET | /api/v1/risk/status | Owned plan/account snapshot; 404 no plan, 409 incomplete profile |
+| POST | /api/v1/risk/check | Only `{proposedRiskMinor:"100"}` accepted |
+
+Auth service exposes equivalent `/v1/auth/*` routes. Risk service exposes
+`POST /v1/risk/check`, requires the bearer token, and loads its own authoritative
+DB context. Unknown client risk/identity fields are rejected. No order is placed;
+response includes `mode: simulation` and `executionAuthorized: false`.
+
+Profile: `{riskTolerance:500,dailyLossLimit:"1750",riskPerTrade:"500",
+maxTrades:3,maxPositions:2,maxDrawdown:1000}`. Tolerance/drawdown use basis points.
+Plan: `{capitalMinor:"35000",dailyLossLimitMinor:"1750",
+riskPerTradeMinor:"500",maxTrades:3}`. Effective time is set on the server.
+Plan limits are the authority for daily/per-trade budgets; profile amounts are
+planning preferences, while maxPositions/maxDrawdown add server constraints.
+
+Snapshot derives daily realized loss consumption from owned trades since UTC
+midnight, reserved risk from non-terminal owned orders, and realized drawdown
+from the owned trade ledger. Wins do not refill daily loss consumption. The
+remote trading/order ingestion API is not implemented; this is a planning check,
+not an execution reservation or authorization. Existing Flutter paper execution
+remains local and is not reflected in this DB.
+
+Browser sends `X-Auth-Client: web`, uses HttpOnly refresh cookie and in-memory
+access token. Refresh requires an allowed Origin; mobile sends refreshToken in
+JSON and must implement OS secure storage. Mobile refresh tokens must never be
+stored by the skeleton transport in ordinary preferences.
+
+Health: `/health` liveness; `/ready` checks DB and required auth/risk schema on
+Gateway/Auth/Risk, responds 503 on dependency failure. Validation 400, auth 401,
+role denial 403, conflict 409; unexpected errors sanitized to 503.
