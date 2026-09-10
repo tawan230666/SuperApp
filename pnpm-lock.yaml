@@ -339,9 +339,21 @@ importers:
 
   services/portfolio-service:
     dependencies:
+      '@tipkhun/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@tipkhun/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@tipkhun/risk-data':
+        specifier: workspace:*
+        version: link:../../packages/risk-data
       express:
         specifier: ^5.1.0
         version: 5.2.1
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/express':
         specifier: ^5.0.3
