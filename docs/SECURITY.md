@@ -59,3 +59,18 @@ ignored. No production secret, AI key or broker credential is introduced.
 Production readiness still requires distributed limiting, secret/dependency
 scanning, TLS, backups/restore, session cleanup, email verification/recovery and
 security review. No production-readiness claim is made.
+## Phase 3 Paper Trading controls
+
+Paper orders are accepted only through the authenticated Gateway → Trading →
+Risk path. The Trading Service derives account, plan limits, usage and owner
+identity from PostgreSQL; client supplied limits are ignored. Account row locks
+and a unique idempotency key make risk reservations atomic and retry safe.
+
+Unknown broker outcomes retain their reservation and mark the account for
+reconciliation. Emergency Stop is synchronized with order creation and blocks
+new entries until an operator resolves the latch. Audit events contain user,
+entity, request and source metadata only; passwords and tokens are never stored.
+
+All execution is deterministic synthetic Paper Broker data. Live brokers,
+real-money execution, withdrawals, production deployment and AI overrides are
+LOCKED.

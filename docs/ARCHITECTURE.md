@@ -58,8 +58,27 @@ PARTIAL. Preview includes all proposed fields and a high daily-risk warning.
 Flutter keeps its existing local model and storage. New interfaces and remote
 adapters live under lib/data/remote with PLATFORM_REPOSITORY=local|remote;
 transport and secure token storage are not wired. Default remains local.
-Redis is provisioned but not used as a dependency by the implemented services.
-No backend worker writes orders/trades; no broker, market feed or AI integration.
+Redis is provisioned but not a financial source of truth.
+
+## Phase 3 Paper Trading — implemented
+
+Gateway proxies owned bot/order/position/trade routes to Trading Service. Trading
+creates a durable paper account, serializes each user through the owner row lock,
+calls the authoritative Risk Service reservation endpoint, and only then invokes
+the deterministic PaperBrokerAdapter. PostgreSQL records state transitions,
+fills, fees, positions, balances and audit events. Idempotency keys are unique per
+account and concurrent reservations serialize against the owner lock.
+
+UNKNOWN outcomes are never retried blindly. They hold their reservation and set
+RECONCILIATION_REQUIRED until broker order/fill evidence permits recovery. Startup
+recovery scans paper accounts and reconciliation compares broker fills, order
+states, positions, cash, fees and realized P&L. Emergency stop and cancellation
+share the account lock; explicit position close is separate and emergency stop
+never liquidates.
+
+Paper Broker supports deterministic market fill, partial fill continuation,
+reject, cancellation, error, unknown outcome and slippage scenarios. No market
+feed, live broker, AI override or real-money execution exists.
 
 Phase 2 acceptance update: Gateway proxies /api/v1/auth to Auth Service through
 AUTH_SERVICE_URL. Earlier direct shared-router mounting is historical. Both

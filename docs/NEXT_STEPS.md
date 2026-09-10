@@ -37,6 +37,14 @@
 Live trading, real-money brokers, production AI, payment/withdrawal and production
 deployment remain LOCKED. Do not advance to them to bypass Phase 2 validation.
 
+## Phase 3 — completed 2026-09-10
+
+Server-side Paper Trading core is implemented and integration verified (20 cases).
+Real `/bot` browser acceptance, Docker service readiness, lint/build and the full
+Phase 2 + Phase 3 integration suites passed. Remaining work is execution
+hardening: richer order/position UX, configurable broker policy, and Flutter HTTP
+transport with mobile secure storage. Live trading remains LOCKED.
+
 ## Phase 2 acceptance closed — next: Phase 3 Paper Trading
 
 The earlier blocker is resolved. PostgreSQL integration and real React browser

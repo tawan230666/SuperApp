@@ -38,7 +38,13 @@ explicit; int8 values remain decimal strings. See the official
   preserves existing credentials/data. No fake balance or plan is seeded.
 
 
-Validation status: SQL runner and persistence code are implemented; actual
-PostgreSQL execution is UNVERIFIED in this environment. Docker is unavailable;
-standalone PostgreSQL initdb was denied shared-memory creation. Do not count
-skipped integration cases as database coverage.
+Validation status: SQL runner and persistence code are implemented; Phase 2
+PostgreSQL acceptance is complete. Phase 3 migrations 004/005 and Paper Trading
+transactions are applied and verified by the real Paper integration suite.
+
+Migration 004 adds paper account balances, broker order/fill records, order event
+history, reservation records, bot heartbeat/state and a database transition
+trigger. Migration 005 adds evidence-backed UNKNOWN recovery transitions. Account
+cash, fees, positions, fills and realized P&L are mutated in a transaction; the
+reconciliation function compares the persisted ledger against broker evidence.
+No destructive reset or volume deletion is used.

@@ -59,6 +59,30 @@ access token. Refresh requires an allowed Origin; mobile sends refreshToken in
 JSON and must implement OS secure storage. Mobile refresh tokens must never be
 stored by the skeleton transport in ordinary preferences.
 
+## Phase 3 Paper Trading
+
+Authenticated Gateway routes proxy to Trading Service (`TRADING_SERVICE_URL`,
+default `http://localhost:3003`). All responses are Simulation/Paper; live
+trading remains `LOCKED`.
+
+`POST /api/v1/bot/start|pause|resume|stop|emergency-stop` validates bot state;
+start creates a paper account from the current plan. Emergency stop atomically
+latches the account and cancels pending orders while leaving positions open.
+`GET /api/v1/bot/status` returns paper cash/equity/realized and unrealized P&L,
+fees, open/pending counts, heartbeat and reconciliation state.
+
+`POST /api/v1/orders` accepts only deterministic `SYNTHETIC-THB` MARKET paper
+orders and requires `Idempotency-Key`. It creates a CREATED order, calls the
+authoritative Risk Service reservation endpoint, then submits PaperBrokerAdapter.
+GET order/list, cancel, partial-fill continuation, positions, explicit position
+close, trades and reconcile endpoints are owned by authenticated user. Unknown
+broker outcomes keep risk reserved and mark reconciliation required; reconcile
+only repairs state when matching broker evidence exists. PostgreSQL enforces the
+state graph and idempotency uniqueness. Scenarios `fill`, `partial`, `reject`,
+`error`, `unknown`, and `slippage` are deterministic test controls, never market
+randomness. Synthetic price, 10 bps fee and all money are integer minor units.
+No broker or real-money execution path exists.
+
 Health: `/health` liveness; `/ready` checks DB and required auth/risk schema on
 Gateway/Auth/Risk, responds 503 on dependency failure. Validation 400, auth 401,
 role denial 403, conflict 409; unexpected errors sanitized to 503.

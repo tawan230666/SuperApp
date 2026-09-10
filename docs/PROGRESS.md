@@ -154,3 +154,36 @@ All six required Phase 2 audit actions verified in DB. Browser runs in official
 Playwright Docker container against isolated real host services and test DB;
 no HTTP mocking. Local .env remains untracked; no reset/volume deletion occurred.
 Phase 3 Paper Trading can begin. Live Trading remains LOCKED.
+
+## Phase 3 — Server-side Paper Trading — COMPLETED — 2026-09-10
+
+Implemented and verified against PostgreSQL through Gateway/Auth/Trading/Risk:
+
+- Durable Paper Account with initial capital, cash, equity, realized/unrealized
+  P&L, fees, positions, orders, trades and heartbeat-backed bot sessions.
+- Bot lifecycle (`READY`, `RUNNING`, `PAUSED`, `STOPPED`,
+  `EMERGENCY_STOPPED`, `ERROR`) with authenticated state transitions and audit.
+- Deterministic PaperBrokerAdapter: market fill, partial fill/continue, reject,
+  cancel, fees, slippage scenario, broker error and UNKNOWN outcome.
+- CREATED → RISK_CHECKED → SUBMITTED → ACKNOWLEDGED → PARTIALLY_FILLED/FILLED
+  → CLOSED state machine enforced by PostgreSQL trigger.
+- Atomic owner-row locking and risk reservation before broker submission; concurrent
+  orders cannot overspend the authoritative plan budget.
+- Account-scoped idempotency; duplicate retries return the original order and
+  payload changes are rejected.
+- Reconciliation compares broker orders/fills/positions/balance/fees/P&L. UNKNOWN
+  is held and only recovered after broker evidence appears; mismatches stop the
+  account and require reconciliation.
+- Gateway proxies all Paper routes. React `/bot` now loads real status and control
+  actions with Emergency Stop confirmation. Flutter keeps local engine and adds
+  `RemoteTradingRepository` behind `local|remote` boundary.
+
+Paper acceptance: `paper.integration.test.ts` **20/20 passed** including atomic
+concurrency, duplicate idempotency, partial fill, cancellation, broker failures,
+unknown recovery, emergency race, ownership, rollback, reconciliation and restart
+recovery. React unit tests **7/7** and browser E2E is run against real services;
+the previous browser test confirms auth/risk and now exercises Bot START/STOP.
+Final acceptance: Phase 2 integration **27/27**, Paper integration **20/20**,
+Node/React unit **25/25**, browser E2E **passed**, and Flutter **48/48**. Lint,
+build and migration checks passed. Live Trading is LOCKED; all broker data is
+synthetic Paper.
