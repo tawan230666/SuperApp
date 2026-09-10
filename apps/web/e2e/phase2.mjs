@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const base=process.env.WEB_TEST_URL??'http://localhost:5173';
 const browser=await chromium.launch({headless:true});
 try {
- const context=await browser.newContext();const page=await context.newPage();
+ const context=await browser.newContext();const page=await context.newPage(); page.on('response', r=>{if(r.url().includes('/auth/')||r.url().includes('/me')||r.url().includes('/bot')) console.log('HTTP',r.status(),r.url())}); page.on('requestfailed', r=>console.log('FAILED',r.url(),r.failure()?.errorText));
  const email=`browser-${Date.now()}@example.test`,password='Browser-test-password-123';
  await page.goto(`${base}/register`);
  await page.getByLabel('Email',{exact:true}).fill(email);
@@ -22,6 +22,7 @@ try {
  await page.getByLabel('riskPerTradeMinor',{exact:true}).fill('500');
  await page.getByRole('button',{name:'ดู Preview',exact:true}).click();
  await page.getByRole('button',{name:'ยืนยันบันทึก',exact:true}).click();
+ console.log('after save', await page.locator('[role=status],[role=alert]').allTextContents());
  await page.getByText('บันทึกแล้ว',{exact:true}).waitFor();
  await page.reload();await page.getByText('Current Plan Version: 1',{exact:true}).waitFor();
  assert.equal(await page.getByLabel('capitalMinor',{exact:true}).inputValue(),'35000');
@@ -40,6 +41,9 @@ try {
  await page.getByRole('button',{name:'เข้าสู่ระบบ',exact:true}).click();
  await page.getByText('ภาพรวมการเงิน',{exact:true}).waitFor();await page.reload();
  await page.getByText('ภาพรวมการเงิน',{exact:true}).waitFor();
+ await page.goto(`${base}/bot`); console.log('bot url', page.url(), 'body', (await page.locator('body').innerText()).slice(0,1000)); await page.getByText('Server-side Paper Trading · Live Trading: LOCKED',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'START',exact:true}).click(); await page.getByText('RUNNING',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'STOP',exact:true}).click(); await page.getByText('STOPPED',{exact:true}).waitFor();
  await page.screenshot({path:'/tmp/tipkhun-phase2-dashboard.png',fullPage:true});
  await page.getByRole('button',{name:'Logout',exact:true}).click();await page.getByRole('heading',{name:'เข้าสู่ระบบ',exact:true}).waitFor();
  console.log('PASS: real React register/login/dashboard, risk save/version/reload, HttpOnly refresh, protected logout and browser refresh');

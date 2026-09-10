@@ -1,5 +1,7 @@
 import { AuthProvider, useAuth } from "./auth";
 import { AuthPage, LiveDashboard, RiskSettings } from "./AccountPages";
+import { api } from "./auth";
+import * as React from "react";
 import {
   NavLink,
   Navigate,
@@ -155,49 +157,40 @@ function Placeholder({
   );
 }
 function Bot() {
+  const [data, setData] = React.useState<any>(null);
+  const [error, setError] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const load = React.useCallback(async () => { try { setData(await api<any>("/bot/status")); } catch (e) { setError((e as Error).message); } }, []);
+  React.useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 5000); return () => window.clearInterval(timer); }, [load]);
+  async function control(action: string) { if (action === "emergency-stop" && !window.confirm("ยืนยัน Emergency Stop? คำสั่งค้างจะถูกยกเลิก แต่ position จะไม่ถูกปิดอัตโนมัติ")) return; setBusy(true); setError(""); try { await api(`/bot/${action}`, { method: "POST", body: "{}" }); await load(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
+  if (error && !data) return <p role="alert">{error}</p>;
+  if (!data) return <p role="status">กำลังโหลด Paper Trading…</p>;
+  const account = data.account ?? {};
   return (
     <>
       <div className="page-title">
         <div>
           <span className="eyebrow">TRADING / PAPER</span>
           <h2>Trading Bot</h2>
-          <p>Risk gateway และสถานะคำสั่งในพื้นที่จำลอง</p>
+          <p>Server-side Paper Trading · Live Trading: LOCKED</p>
         </div>
         <button
           className="button danger"
-          onClick={() =>
-            window.alert(
-              "Emergency Stop ต้องยืนยันใน Flutter Paper client หรือ API ที่ได้รับอนุญาต",
-            )
-          }
+          disabled={busy} onClick={() => control("emergency-stop")}
         >
-          Emergency Stop
+          EMERGENCY STOP
         </button>
       </div>
-      <section className="metrics">
-        <Metric
-          label="Bot Status"
-          value="READY"
-          note="ยังไม่ได้เริ่ม Paper session"
-        />
-        <Metric label="Trading Mode" value="PAPER" note="Live: LOCKED" />
-        <Metric
-          label="Risk Remaining"
-          value="—"
-          note="Risk service unavailable"
-          tone="warning"
-        />
-        <Metric label="Open Positions" value="0" />
-        <Metric label="Pending Orders" value="0" />
-        <Metric label="AI Agent" value="OFFLINE" />
-      </section>
+      {error&&<p role="alert">{error}</p>}
+      <section className="metrics"><Metric label="Bot Status" value={data.state}/><Metric label="Trading Mode" value="PAPER" note="Live: LOCKED"/><Metric label="Cash" value={String(account.cashMinor ?? "—")}/><Metric label="Equity" value={String(account.equityMinor ?? "—")}/><Metric label="Daily P&L" value={String(data.dailyPnlMinor ?? "0")}/><Metric label="Open Positions" value={String(data.openPositions ?? 0)}/><Metric label="Pending Orders" value={String(data.pendingOrders ?? 0)}/><Metric label="Fees" value={String(account.feesMinor ?? "0")}/><Metric label="Broker" value={data.brokerStatus}/></section>
+      <div className="status-row"><button className="button primary" disabled={busy||data.state==='RUNNING'} onClick={() => control('start')}>START</button><button className="button secondary" disabled={busy||data.state!=='RUNNING'} onClick={() => control('pause')}>PAUSE</button><button className="button secondary" disabled={busy||data.state!=='PAUSED'} onClick={() => control('resume')}>RESUME</button><button className="button secondary" disabled={busy||['STOPPED','EMERGENCY_STOPPED'].includes(data.state)} onClick={() => control('stop')}>STOP</button></div>
       <section className="grid two">
         <Panel title="Broker Connection">
           <div className="status-row">
-            <span className="pill muted">DISCONNECTED</span>
-            <b>Mock Broker only</b>
+            <span className="pill">{data.brokerStatus}</span>
+            <b>Paper Broker Adapter</b> <span>Mock Broker only</span>
           </div>
-          <p>ยังไม่มี backend service ที่รับผิดชอบ execution</p>
+          <p>Paper fills are persisted in PostgreSQL; live execution remains locked.</p>
         </Panel>
         <Panel title="Strategy & Market">
           <p>
@@ -208,12 +201,12 @@ function Bot() {
             <br />
             Timeframe: Manual
             <br />
-            Last market update: —
+            Last heartbeat: {data.lastHeartbeat ?? "—"}
           </p>
         </Panel>
       </section>
       <Panel title="Recent Orders">
-        <Empty>ยังไม่มีคำสั่งใน Paper session</Empty>
+        <Empty>ใช้ GET /api/v1/orders เพื่อดูคำสั่งของคุณ</Empty>
       </Panel>
     </>
   );
