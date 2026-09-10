@@ -12,9 +12,11 @@ const env = {
   ...process.env,
   DATABASE_URL: url,
   NODE_ENV: "test",
+  TEST_MODE: "1",
   RUN_DB_TESTS: "1",
   RISK_SERVICE_URL: "http://127.0.0.1:13001",
   AUTH_SERVICE_URL: "http://127.0.0.1:13002",
+  TRADING_SERVICE_URL: "http://127.0.0.1:13003",
 };
 const migrated = spawnSync(
   "pnpm",
@@ -23,6 +25,7 @@ const migrated = spawnSync(
 );
 if (migrated.status !== 0) process.exit(1);
 const children = [
+  spawn("node",["services/trading-service/dist/server.js"],{env:{...env,NODE_ENV:"development",TRADING_PORT:"13003"},stdio:"inherit"}),
   spawn("node",["services/auth-service/dist/server.js"],{env:{...env,NODE_ENV:"development",AUTH_PORT:"13002"},stdio:"inherit"}),
   spawn("node", ["services/risk-service/dist/server.js"], {
     env: { ...env, NODE_ENV: "development", RISK_PORT: "13001" },
@@ -33,7 +36,7 @@ try {
   let healthy = false;
   for (let i = 0; i < 30; i++) {
     try {
-      if ((await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok) {
+      if ((await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok) {
         healthy = true;
         break;
       }
@@ -49,7 +52,7 @@ try {
       "exec",
       "vitest",
       "run",
-      "src/integration.test.ts",
+      process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
     ],
     { env, stdio: "inherit" },
   );

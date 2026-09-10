@@ -69,7 +69,7 @@ export const authorize =
       throw new HttpError(403, "Forbidden");
     next();
   };
-export function baseApp(service: string): express.Express {
+export function baseApp(service: string, dependencyReady?:()=>Promise<void>): express.Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(helmet());
@@ -85,7 +85,7 @@ export function baseApp(service: string): express.Express {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  app.use(rateLimit({ windowMs: 60000, limit: 120 }));
+  app.use(rateLimit({ windowMs: 60000, limit: process.env.NODE_ENV === "test" || process.env.TEST_MODE === "1" ? 10000 : 120 }));
   app.use(express.json({ limit: "32kb" }));
   app.get("/health", (_req, res) => res.json({ service, status: "ok" }));
   app.get("/ready", async (_req, res) => {
@@ -93,6 +93,7 @@ export function baseApp(service: string): express.Express {
       await ready();
       await pool.query("SELECT max_positions FROM risk_profiles LIMIT 0");
       await pool.query("SELECT id FROM auth_sessions LIMIT 0");
+      await dependencyReady?.();
       res.json({ service, status: "ready" });
     } catch {
       res.status(503).json({ service, status: "unavailable" });
@@ -122,11 +123,12 @@ const errors: ErrorRequestHandler = (err, _req, res, _next) => {
     });
 };
 export function finish(app: express.Express) {
+  app.use((_req, res) => res.status(404).json({ error: "Not found", requestId: res.locals.requestId }));
   app.use(errors);
 }
 export function authRoutes(): express.Router {
   const router = express.Router();
-  router.use(rateLimit({ windowMs: 15 * 60000, limit: 40 }));
+  router.use(rateLimit({ windowMs: 15 * 60000, limit: process.env.NODE_ENV === "test" || process.env.TEST_MODE === "1" ? 10000 : 40 }));
   function refreshInput(req: express.Request) {
     const origin = req.header("origin");
     if (

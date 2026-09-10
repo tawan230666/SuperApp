@@ -10,7 +10,7 @@
     "db:migrate": "node tool/database.mjs migrate",
     "db:status": "node tool/database.mjs status",
     "db:seed": "node tool/database.mjs seed",
-    "test:integration": "node tool/integration.mjs",
+    "test:integration": "node tool/integration.mjs && node tool/integration.mjs paper",
     "test:unit": "pnpm -r test",
     "test:browser": "node tool/browser-integration.mjs"
   }
