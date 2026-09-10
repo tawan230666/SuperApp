@@ -199,6 +199,6 @@ reconciliation failures. Flutter has a secure-storage HTTP transport and remote
 allocation boundary while local repositories remain the default. Test-only
 `profit` and `even` scenarios derive exit fills, fees and net P&L from persisted
 data; production mode rejects those controls. Full acceptance passed: Phase 2
-27/27, Paper/ledger/allocation integration 24/24, browser E2E including profit
+27/27, Paper/ledger/allocation integration 25/25, browser E2E including profit
 allocation, React unit 7/7, Flutter 49/49, lint and build, with zero failed and
 zero skipped acceptance tests.
