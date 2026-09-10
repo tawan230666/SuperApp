@@ -6,3 +6,20 @@
 .auth-form label,.risk-form label {display:grid;gap:6px;margin:12px 0;}
 .auth-form input,.risk-form input {padding:12px;border:1px solid #536270;border-radius:8px;background:transparent;color:inherit;}
 .risk-form {max-width:540px;} pre {overflow:auto;white-space:pre-wrap;} [role=alert] {color:#f38b8b;}
+.portfolio-page { display:grid; gap:20px; }
+.portfolio-metrics { display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px; }
+.portfolio-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px; }
+.portfolio-page .panel { padding:20px; min-width:0; }
+.portfolio-page label { display:flex;flex-direction:column;gap:6px;margin:12px 0; }
+.portfolio-page input,.portfolio-page select { padding:10px;border:1px solid #344151;border-radius:8px;background:#15212e;color:inherit;max-width:100%; }
+.portfolio-page button { margin:8px 8px 8px 0;padding:10px 16px;border-radius:8px;border:1px solid #54757b;background:#163e43;color:#e3fffa;cursor:pointer; }
+.portfolio-page button:disabled { opacity:.45;cursor:default; }
+.portfolio-page [role=alert] { padding:12px;background:#492727;color:#ffe1d3;border-radius:8px; }
+.portfolio-page [role=status] { color:#70e6b2; }
+.portfolio-page .table-scroll { overflow-x:auto; }
+.portfolio-page table { width:100%;border-collapse:collapse; }
+.portfolio-page td,.portfolio-page th { padding:12px;text-align:left;border-bottom:1px solid #344151; }
+.portfolio-page td small { display:block;max-width:250px; }
+.portfolio-page meter { display:block;width:100%;margin:4px 0 12px; }
+.portfolio-page svg { width:100%;color:#66d8b7; }
+@media(max-width:900px){.portfolio-columns{grid-template-columns:1fr;}}

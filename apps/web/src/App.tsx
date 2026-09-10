@@ -1,3 +1,4 @@
+import {PortfolioPage} from "./PortfolioPage";
 import { AuthProvider, useAuth } from "./auth";
 import { AuthPage, LiveDashboard, RiskSettings } from "./AccountPages";
 import { api } from "./auth";
@@ -351,10 +352,7 @@ function ProtectedApp() {
         <Route
           path="/long-term"
           element={
-            <Placeholder
-              title="Long-Term Portfolio"
-              description="ยังไม่มี holdings หรือ market data จริง"
-            />
+            <PortfolioPage />
           }
         />
         <Route path="/assistant" element={<Assistant />} />
