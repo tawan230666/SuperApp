@@ -78,3 +78,15 @@ Ledger entries are immutable and allocation confirmation uses owner row locks,
 unique idempotency keys and server-derived realized profit. Client submitted
 cash, profit or allocation totals are never trusted. Mobile refresh credentials
 use OS secure storage in the remote transport; local mode remains available.
+
+## Phase 5 controls
+
+Portfolio endpoints authenticate at Gateway and service; owner is session identity. Strict order/funding/target bodies reject client cash, price, cost basis or P&L overrides. Curated asset lookup has no public insertion endpoint. All SQL values are parameterized. Idempotency is owner-scoped, hash-checked and DB constrained; owner locks prevent simultaneous buys/funds from double-spending.
+
+Portfolio ledger balance/ownership constraints are deferred to commit; entries, financial transaction history, portfolio ledger headers and snapshots cannot be updated/deleted. Reconciliation compares cash, per-asset quantity/cost, realized P&L, ledger and immutable history. A mismatch commits one alert/latch and blocks execution; it never repairs money silently. Administrative correction is a reviewed compensating transaction, not an exposed endpoint.
+
+Test price controls require non-production NODE_ENV, explicit flags, and a `_test` database. No client-defined price field, public production test route, or React debug-price interface exists. Fixture prices remain clearly labeled in production-shaped local builds; there is no live provider. Production-configured test process is local validation only, not deployment.
+
+Flutter uses memory access credentials and OS secure refresh storage on native targets. Browser transport defaults to an ephemeral memory refresh store. An injected memory store supports tests without mocking HTTP. Successful refresh saves both new tokens before retry; concurrent 401s share one rotation; invalid refresh clears state; logout clears credentials. No SharedPreferences token, credential logs, or persistent browser localStorage token. HTTP is allowed only on local loopback/emulator hosts; all other servers require HTTPS.
+
+The acceptance harness creates only temporary test-account credentials (no access/refresh tokens) in a private shared fixture directory, removes that directory on completion, and never commits it. Database .env files remain ignored. Native keychain behavior on physical devices has not been device-tested; plugin-backed storage and real HTTP transport are separate verification boundaries.

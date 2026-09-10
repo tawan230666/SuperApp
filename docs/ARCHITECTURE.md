@@ -88,3 +88,11 @@ Trading/Paper fills post double-entry ledger transactions; allocation preview
 and confirmation consume only server-derived realized profit. React and Flutter
 read the same authenticated Gateway resources. No in-memory state is treated as
 authoritative.
+
+## Phase 5 extension — no architecture replacement
+
+React /long-term and Flutter RemotePortfolioRepository → existing authenticated Gateway → Portfolio Service (3006) → MarketDataProvider + shared PostgreSQL transaction/ledger layer. Allocation still owns Profit Router; portfolio funding consumes its LONG_TERM_RESERVE bucket. Trading/Risk respect earmarked reserves and transferred funding. Provider data determines execution price; clients never supply trusted money/valuation fields.
+
+Fixture provider is the default. The deterministic provider is enabled only on explicitly guarded test databases. No external market connection. Portfolio state, quantities, average cost, snapshots, targets and watchlist survive process restart. A portfolio reconciliation latch blocks new mutations; no in-memory source of truth.
+
+Flutter remote transport now accepts/saves access and rotated refresh credentials correctly, coordinates concurrent refreshes, retries once, clears logout state, uses HTTPS outside loopback development, and stores mobile refresh credentials in OS secure storage. Web can use ephemeral memory sessions instead of persistent browser credential storage. Platform local engine/UI is preserved. Shared React → Flutter → React verification runs against real HTTP/PostgreSQL in the browser harness.

@@ -15,3 +15,7 @@ The acceptance flow verifies 50/30/20 routing, 101-minor-unit remainder
 rounding, preview side-effect freedom, concurrent confirmation locking,
 idempotent retries, owner isolation and shared backend reads from Flutter's
 remote repository.
+
+## Portfolio funding consumer
+
+Long-term allocations remain reserves until an explicit, idempotent, atomic TRANSFER_TO_PORTFOLIO posts to the ledger. Funding cannot exceed the credit-net LONG_TERM_RESERVE balance. Allocation available uses the remaining REALIZED_PROFIT credit-net balance directly: allocation debits already consumed profit, so batch history must not be subtracted a second time. Historical realized trading P&L remains in trades. Portfolio realized P&L is a separate bucket and is not automatically routed again.

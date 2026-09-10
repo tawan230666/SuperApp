@@ -93,3 +93,27 @@ ledger summary/transactions, notifications, allocation settings/available/
 preview/confirm/history, long-term cash and withdrawal reserve. Allocation
 confirm requires `Idempotency-Key` and derives realized profit from PostgreSQL.
 All values are Paper minor units; live execution remains LOCKED.
+
+## Phase 5 — Paper Portfolio and fixture market data
+
+All routes below require Bearer authentication and derive owner from that session. Money and quantity are strings; request bodies are strict and reject financial overrides. Portfolio Service runs on 3006 behind the existing Gateway.
+
+| Method | Gateway path | Input / behavior |
+| --- | --- | --- |
+| GET | /api/v1/portfolio/cash | cashMinor, longTermReservedCashMinor, portfolioId, PAPER/THB |
+| POST | /api/v1/portfolio/fund | {amountMinor:"300"}; Idempotency-Key required |
+| GET | /api/v1/portfolio/funding-history | Owned immutable funding transactions |
+| POST | /api/v1/portfolio/orders/preview | {side:"BUY",symbol:"PTT",quantity:"10"}; no execution/ledger mutation |
+| POST | /api/v1/portfolio/orders | Same body, BUY or SELL; Idempotency-Key required |
+| GET | /api/v1/portfolio/orders | Owned filled Paper executions, quote/ledger references |
+| GET | /api/v1/portfolio | Server valuation, P&L, holdings, targets/deviations and risk |
+| GET | /api/v1/portfolio/holdings | Owned current holdings with quote metadata |
+| GET | /api/v1/portfolio/performance | Up to 200 real observed snapshots, chronological |
+| GET/PUT | /api/v1/portfolio/targets | PUT {targets:[{target:"PTT",weightBps:6000},{target:"TDEX",weightBps:3000},{target:"CASH",weightBps:1000}],concentrationLimitBps:6000}; limit optional |
+| GET | /api/v1/market/assets?q= | Curated active assets (up to 50) |
+| GET | /api/v1/market/quotes/:symbol | Server fixture quote with freshness/source metadata |
+| GET | /api/v1/market/history/:symbol | Owned observed execution quotes only |
+| GET/POST | /api/v1/watchlist | POST {symbol:"PTT"} |
+| DELETE | /api/v1/watchlist/:symbol | Remove own watchlist item |
+
+Errors include 400 invalid input, 401 auth, 404 unknown asset, 409 INSUFFICIENT_RESERVE / INSUFFICIENT_CASH / INSUFFICIENT_HOLDINGS / IDEMPOTENCY_CONFLICT / MARKET_DATA_STALE / RECONCILIATION_REQUIRED, and 503 MARKET_DATA_UNAVAILABLE. Execution confirm revalidates a fresh price and balances; previews are estimates, not reserved quotes. GET valuation/performance creates an actual snapshot; order preview never posts ledger entries. Test-only market control and production guards are documented in MARKET_DATA.md. Live trading remains LOCKED.

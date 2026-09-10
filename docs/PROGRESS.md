@@ -1,3 +1,45 @@
+# Current status — 2026-09-11
+
+Phase 2 = COMPLETED. Phase 3 = COMPLETED. Phase 4 = COMPLETED.
+**Phase 5 — Long-Term Portfolio + Market Data Foundation = COMPLETED.**
+
+Implemented on the existing platform: runnable Portfolio Service (3006), owner-scoped PostgreSQL persistence, ledger reserve funding, atomic/idempotent Paper BUY/SELL, six-decimal quantities, weighted-average cost with capitalized entry fees, server valuations/P&L, real observed snapshots, targets/deviations/concentration/sector risk, watchlist and guarded deterministic/fixture providers. Curated PTT/TDEX identities use explicitly synthetic prices; no external feed or live execution.
+
+React /long-term provides funding and order previews/confirmation, holdings, observed performance chart, allocations, sectors, targets and watchlist. Flutter adds portfolio/market repositories and feature-flag factories while preserving local UI/engines. Real browser acceptance proves React BUY → Flutter reads identical holding/allocation IDs → Flutter SELL/watchlist → React reload sees the same DB state, then React SELL closes the holding. Remote session rotation is exercised twice against real Auth/PostgreSQL.
+
+Portfolio ledger entries/header/transaction history/snapshots are immutable. Deferred balance/ownership constraints plus sealed transaction entry sets prevent historical mutation/appending. Funding and orders use owner locks and DB uniqueness; concurrent tests cannot overdraw reserves or portfolio cash. Reconciliation compares per-asset quantities/costs, cash, P&L, history and ledger; mismatch latches and emits a deduplicated alert without repairing balances silently. Trading risk excludes earmarked reserve and transferred portfolio funds. Allocation availability no longer subtracts already-debited batches twice.
+
+## Final validation
+
+| Suite | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Node/React unit | 34 | 0 | 0 |
+| Phase 2 integration | 27 | 0 | 0 |
+| Paper/ledger/allocation integration | 25 | 0 | 0 |
+| Portfolio integration | 17 | 0 | 0 |
+| Browser scripts/flows | 3 | 0 | 0 |
+| Flutter unit/widget/repository | 53 | 0 | 0 |
+| Flutter real shared-backend acceptance | 1 | 0 | 0 |
+
+`pnpm lint`, `pnpm build` (also run by `pnpm test`), `pnpm test`, `pnpm test:integration`, `pnpm test:browser`, `flutter analyze --no-pub` and `flutter test --no-pub` passed. The integration total is **69**, not counting unit tests. Packages reporting passWithNoTests contribute zero coverage. The three browser flows are scripts, not an inflated number of individual assertions. Expected unauthenticated 401s in browser logs are negative checks, not failed tests.
+
+Migrations 001–010 are applied on development and dedicated test PostgreSQL; no reset, record deletion or volume removal. Docker PostgreSQL/Redis are healthy; Compose configuration validates. Real local production-configured Portfolio process proves test controls are absent and restart recovers persisted state. No production deployment occurred.
+
+Two test-environment issues were fixed: HTTP local browser lacked crypto.randomUUID (now secure getRandomValues keys); old Trading restart test allowed only two seconds while accumulated DB recovery takes roughly 2.7 seconds (now bounded readiness with diagnostics and cleanup). The failed old test left PID 238 on port 13004; lsof confirmed it belonged to this test checkout. Sandbox denied SIGTERM, so it was not force-stopped; harnesses use a separate checked port 13008 and reject port collisions without killing unrelated processes.
+
+Source remains /Users/tawan/Project/SuperApp, which has no .git. As in prior milestones, only explicit changed source/config/test/docs files are synchronized to the existing publishing checkout /private/tmp/tipkhun-phase2-checkout on feature/platform-architecture. No generated cache, local .env or credentials are published. High-confidence secret scan and git diff --check passed.
+
+IMPLEMENTED: Paper portfolio and shared backend acceptance above.
+MOCK: deterministic/fixture prices and Paper execution; no genuine market prices.
+PARTIAL: Flutter native portfolio UI remains existing local UI; remote repository/transport is real and tested, OS keychain is not physically device-tested. Advanced performance (TWR/IRR), tax lots, corporate actions and ETF constituent look-through are future scope.
+LOCKED: live brokers, real money, withdrawals, paid/external market APIs, AI and production deployment. Public accounting-correction/reversal endpoint is not exposed; remediation requires reviewed compensating transactions.
+
+Stop after Phase 5. Phase 6 is not started.
+
+---
+
+# Historical progress (preserved)
+
 # Tipkhun Capital — Progress 2026-09-08
 
 ## Delivered: local paper execution foundation

@@ -1,3 +1,17 @@
+# Current next step — after Phase 5 acceptance (2026-09-11)
+
+Phase 2–5 are COMPLETED. Do not restart their architecture or treat the historical blockers below as current.
+
+Stop here for user review. A separately authorized Phase 6 can introduce a read-only AI Financial Copilot / Investment Analysis boundary. It must identify fixture prices honestly, use server ledger/portfolio data, and have no execution or risk-override authority. No AI integration, key, paid API or Phase 6 implementation was started in this milestone.
+
+Before future real market data: choose provider, review licensing/terms/rate limits and request user authorization. Before broader portfolio analytics: define corporate actions, tax lots, multi-currency accounting and return methodology. Native mobile UI and physical-device secure-storage validation can extend the now-tested remote repository without deleting local fallback.
+
+Current evidence and exact test counts: PROGRESS.md. Financial formulas/limits: PORTFOLIO.md. Provider guards and curated metadata sources: MARKET_DATA.md.
+
+---
+
+# Historical next-step notes (superseded by current status above)
+
 # Next steps
 
 1. Finish Phase 1 before external broker integration: versioned plans effective on future accounting days, immutable balanced ledger with idempotent posting, atomic SQLite migration with backup/rollback and legacy fixtures. Keep old journal lock until migration passes regression tests.

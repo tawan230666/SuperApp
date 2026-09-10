@@ -52,3 +52,13 @@ Migration 006 adds immutable `ledger_accounts`, `ledger_transactions`,
 `ledger_entries`, `allocation_settings`, `allocation_batches`, and
 `notifications`. Ledger entries are protected by a database trigger and all
 allocation confirmation writes occur in one transaction.
+
+## Phase 5 migrations 007–010
+
+007 extends ledger buckets and adds portfolios, portfolio_cash, assets, portfolio_transactions, portfolio_snapshots, target_allocations, watchlists, watchlist_assets, market_price_snapshots and owner-scoped paper_market_controls. It extends legacy portfolio_holdings with nullable portfolio/asset IDs; pre-existing legacy records are preserved. Composite foreign keys enforce portfolio transaction/holding ownership. Quantities use NUMERIC at six-decimal execution precision; money uses BIGINT. All dates are timestamptz.
+
+008 adds immutable portfolio ledger headers and deferred balance/ownership checks for appended entries, complementing the initial deferred ledger balance checks. 009 registers verified PTT/TDEX identities and deactivates initial synthetic test symbols without deleting references. Existing 001–006 are unchanged. The runner applies new migrations transactionally and retains checksum/history; no reset, volume removal or data deletion.
+
+Owner row locks serialize funding and execution with Allocation/Trading. `(user_id,idempotency_key)` enforces retry uniqueness. Financial records and snapshots are immutable; target/watchlist settings are mutable preferences with audit. Portfolio cash/holdings are projections, checked against immutable ledger/transactions before mutation. See PORTFOLIO.md for signs, fee allocation, reconciliation and correction policy.
+
+Migration 010 seals portfolio ledger entry sets after commit using the creating PostgreSQL transaction ID. Corrections must use a new header; even balanced entries cannot be appended to an old portfolio ledger transaction.

@@ -75,3 +75,11 @@ Gateway on 14002/14001/14000 and Vite 15173 against TEST_DATABASE_URL, then runs
 Chromium in the official Playwright v1.55.0-noble container. Docker accesses Vite
 via the specifically allowlisted host.docker.internal hostname. No HTTP mocking.
 `node tool/phase2-api.mjs` exercises the development API on port 3000.
+
+## Phase 5
+
+`pnpm db:migrate` applies 007–010 to the configured development DB. `pnpm dev` now also starts Portfolio Service at http://localhost:3006. Gateway /api/v1/portfolio routes to it. Docker's optional `services` profile includes portfolio-service and readiness checks. The normal provider uses fixture prices; no keys or external services are required.
+
+`pnpm test:integration` runs Phase 2, Paper/ledger/allocation and Portfolio suites on a dedicated `_test` database. `pnpm test:browser` runs three browser flows plus the real Flutter remote repository acceptance against ports 14000–14006 and Vite 15173. Docker/Playwright and Flutter are required. It fails if any flow fails; there is no skipped-acceptance fallback. Flutter acceptance uses `--dart-define=PLATFORM_REPOSITORY=remote`; the ordinary Flutter UI remains local by default.
+
+Migration 010 seals portfolio ledger entry sets after commit using the creating PostgreSQL transaction ID. Corrections must use a new header; even balanced entries cannot be appended to an old portfolio ledger transaction.
