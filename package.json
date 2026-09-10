@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "pnpm build && node tool/dev.mjs",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm build && pnpm test:unit && pnpm test:integration",
     "lint": "pnpm -r lint",
     "db:migrate": "node tool/database.mjs migrate",
     "db:status": "node tool/database.mjs status",
     "db:seed": "node tool/database.mjs seed",
-    "test:integration": "node tool/integration.mjs"
+    "test:integration": "node tool/integration.mjs",
+    "test:unit": "pnpm -r test",
+    "test:browser": "node tool/browser-integration.mjs"
   }
 }
