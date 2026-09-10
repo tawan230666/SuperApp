@@ -3,9 +3,13 @@
   "private": true,
   "packageManager": "pnpm@11.0.8",
   "scripts": {
-    "dev": "pnpm --parallel --filter @tipkhun/api-gateway --filter @tipkhun/risk-service dev",
+    "dev": "pnpm build && node tool/dev.mjs",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "db:migrate": "node tool/database.mjs migrate",
+    "db:status": "node tool/database.mjs status",
+    "db:seed": "node tool/database.mjs seed",
+    "test:integration": "node tool/integration.mjs"
   }
 }

@@ -5,28 +5,35 @@ services:
       POSTGRES_USER: tipkhun
       POSTGRES_PASSWORD: tipkhun_dev
       POSTGRES_DB: tipkhun
-    ports: ["5432:5432"]
-    volumes: ["tipkhun-postgres:/var/lib/postgresql/data", "../database/migrations:/docker-entrypoint-initdb.d:ro"]
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["tipkhun-postgres:/var/lib/postgresql/data"]
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U tipkhun -d tipkhun"], interval: 5s, timeout: 3s, retries: 10}
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:6379:6379"]
     volumes: ["tipkhun-redis:/data"]
     command: ["redis-server", "--appendonly", "yes"]
     healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10}
   api-gateway:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: api-gateway}}
     profiles: ["services"]
-    environment: ["NODE_ENV=production", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001"]
-    ports: ["3000:3000"]
+    environment: ["NODE_ENV=development", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on: {risk-service: {condition: service_healthy}}
   risk-service:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: risk-service}}
     profiles: ["services"]
-    environment: ["NODE_ENV=production", "RISK_PORT=3001"]
-    ports: ["3001:3001"]
+    environment: ["NODE_ENV=development", "RISK_PORT=3001", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    ports: ["127.0.0.1:3001:3001"]
     depends_on: {postgres: {condition: service_healthy}, redis: {condition: service_healthy}}
     healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3001/ready"], interval: 5s, timeout: 3s, retries: 10}
+  auth-service:
+    build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: auth-service}}
+    profiles: ["services"]
+    environment: ["NODE_ENV=development", "AUTH_PORT=3002", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    ports: ["127.0.0.1:3002:3002"]
+    depends_on: {postgres: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3002/ready"], interval: 5s, timeout: 3s, retries: 10}
 volumes:
   tipkhun-postgres:
   tipkhun-redis:

@@ -1,0 +1,11 @@
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS daily_loss_limit_minor bigint CHECK(daily_loss_limit_minor>0);
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS risk_per_trade_minor bigint CHECK(risk_per_trade_minor>0);
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS max_trades integer CHECK(max_trades BETWEEN 1 AND 100);
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS max_positions integer CHECK(max_positions BETWEEN 1 AND 100);
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS max_drawdown_bps integer CHECK(max_drawdown_bps BETWEEN 1 AND 10000);
+ALTER TABLE risk_profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+CREATE UNIQUE INDEX IF NOT EXISTS risk_profiles_owner ON risk_profiles(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS investment_plans_owner ON investment_plans(user_id);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS emergency_stop boolean NOT NULL DEFAULT false;
+CREATE OR REPLACE FUNCTION protect_plan_history() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Plan version history is immutable'; END $$;
+CREATE TRIGGER plan_versions_immutable BEFORE UPDATE OR DELETE ON plan_versions FOR EACH ROW EXECUTE FUNCTION protect_plan_history();
