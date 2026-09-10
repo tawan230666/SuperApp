@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 if(existsSync('.env'))process.loadEnvFile('.env');
 if(!process.env.TEST_DATABASE_URL||!new URL(process.env.TEST_DATABASE_URL).pathname.endsWith('_test'))throw new Error('Dedicated TEST_DATABASE_URL required');
-const env={...process.env,DATABASE_URL:process.env.TEST_DATABASE_URL,NODE_ENV:'development',AUTH_PORT:'14002',RISK_PORT:'14001',TRADING_PORT:'14003',ALLOCATION_PORT:'14005',API_PORT:'14000',AUTH_SERVICE_URL:'http://127.0.0.1:14002',RISK_SERVICE_URL:'http://127.0.0.1:14001',TRADING_SERVICE_URL:'http://127.0.0.1:14003',ALLOCATION_SERVICE_URL:'http://127.0.0.1:14005',API_GATEWAY_URL:'http://127.0.0.1:14000',WEB_ORIGIN:'http://host.docker.internal:15173'};
+const env={...process.env,DATABASE_URL:process.env.TEST_DATABASE_URL,NODE_ENV:'development',TEST_MODE:'1',AUTH_PORT:'14002',RISK_PORT:'14001',TRADING_PORT:'14003',ALLOCATION_PORT:'14005',API_PORT:'14000',AUTH_SERVICE_URL:'http://127.0.0.1:14002',RISK_SERVICE_URL:'http://127.0.0.1:14001',TRADING_SERVICE_URL:'http://127.0.0.1:14003',ALLOCATION_SERVICE_URL:'http://127.0.0.1:14005',API_GATEWAY_URL:'http://127.0.0.1:14000',WEB_ORIGIN:'http://host.docker.internal:15173'};
 const children=['auth-service','risk-service','trading-service','allocation-service','api-gateway'].map(s=>spawn('node',[`services/${s}/dist/server.js`],{env,stdio:'inherit'}));
 children.push(spawn('pnpm',['--filter','@tipkhun/web','exec','vite','--host','0.0.0.0','--port','15173','--strictPort'],{env,stdio:'inherit'}));
 try {

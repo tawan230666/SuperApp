@@ -40,6 +40,7 @@ export async function api<T>(
       "content-type": "application/json",
       "x-auth-client": "web",
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(options.headers as Record<string, string> | undefined),
     },
   });
   if (
