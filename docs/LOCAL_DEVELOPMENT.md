@@ -68,3 +68,10 @@ Current environment: Docker daemon unreachable; launching Docker fails, and
 standalone PostgreSQL initialization is denied shared-memory creation. Therefore
 integration validation is BLOCKED, not passed. A reachable dedicated PostgreSQL
 instance is required to finish Phase 2 acceptance.
+
+Phase 2 acceptance is now complete. `pnpm test` includes build, unit and DB suites;
+`pnpm test:unit` is DB-independent. `pnpm test:browser` starts isolated Auth/Risk/
+Gateway on 14002/14001/14000 and Vite 15173 against TEST_DATABASE_URL, then runs
+Chromium in the official Playwright v1.55.0-noble container. Docker accesses Vite
+via the specifically allowlisted host.docker.internal hostname. No HTTP mocking.
+`node tool/phase2-api.mjs` exercises the development API on port 3000.

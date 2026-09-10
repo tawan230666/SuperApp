@@ -139,3 +139,18 @@ feature/platform-architecture at 2fec65f; existing tracked source matched before
 changes. Publishing uses that safe checkout. No main edit, reset or force push.
 This checkpoint is implementation work with an open acceptance blocker, not a
 completed Phase 2 release.
+
+## Phase 2 acceptance — COMPLETED — 2026-09-10
+
+Supersedes the earlier blocker: Docker PostgreSQL 16 and Redis healthy; real
+migrations succeeded. Verified 18 tables, 27 indexes, 57 constraints and immutable
+plan trigger. Gateway authentication now calls the real Auth Service over HTTP.
+pnpm lint/build passed; pnpm test runs 25 unit/component + 27 real PostgreSQL
+cases = 52 passed, 0 skipped, 0 failed. Flutter analyze passed and 48 tests passed
+with telemetry suppressed. Total 100 tests plus two real acceptance workflows:
+HTTP register-through-revocation and Chromium React register/login/dashboard,
+risk preview/save/version/reload, HttpOnly refresh, logout and protected redirects.
+All six required Phase 2 audit actions verified in DB. Browser runs in official
+Playwright Docker container against isolated real host services and test DB;
+no HTTP mocking. Local .env remains untracked; no reset/volume deletion occurred.
+Phase 3 Paper Trading can begin. Live Trading remains LOCKED.

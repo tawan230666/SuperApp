@@ -60,3 +60,7 @@ adapters live under lib/data/remote with PLATFORM_REPOSITORY=local|remote;
 transport and secure token storage are not wired. Default remains local.
 Redis is provisioned but not used as a dependency by the implemented services.
 No backend worker writes orders/trades; no broker, market feed or AI integration.
+
+Phase 2 acceptance update: Gateway proxies /api/v1/auth to Auth Service through
+AUTH_SERVICE_URL. Earlier direct shared-router mounting is historical. Both
+Gateway/Auth/DB and Gateway/Risk/DB network paths passed integration acceptance.

@@ -36,3 +36,10 @@
 
 Live trading, real-money brokers, production AI, payment/withdrawal and production
 deployment remain LOCKED. Do not advance to them to bypass Phase 2 validation.
+
+## Phase 2 acceptance closed — next: Phase 3 Paper Trading
+
+The earlier blocker is resolved. PostgreSQL integration and real React browser
+acceptance passed on 2026-09-10. `pnpm test` now includes DB tests and fails if the
+test DB is unavailable. Proceed with atomic reservations, idempotent durable
+paper orders, reconciliation, emergency-stop races and remote bot UI.
