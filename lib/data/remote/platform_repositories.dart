@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -66,31 +67,152 @@ abstract interface class AuthenticatedTransport {
 /// Production-shaped mobile transport: access tokens stay in memory and the
 /// refresh token is held by OS secure storage. It retries one request after a
 /// server-side refresh and never writes credentials to SharedPreferences.
+abstract interface class RefreshTokenStore {
+  Future<String?> read();
+  Future<void> write(String value);
+  Future<void> clear();
+}
+
+class SecureRefreshTokenStore implements RefreshTokenStore {
+  SecureRefreshTokenStore([FlutterSecureStorage? storage])
+    : _storage = storage ?? const FlutterSecureStorage();
+  final FlutterSecureStorage _storage;
+  @override
+  Future<String?> read() => _storage.read(key: 'tipkhun_refresh');
+  @override
+  Future<void> write(String value) =>
+      _storage.write(key: 'tipkhun_refresh', value: value);
+  @override
+  Future<void> clear() => _storage.delete(key: 'tipkhun_refresh');
+}
+
+/// Browser/desktop runners may opt into ephemeral sessions explicitly.
+/// This store never writes long-lived credentials to browser storage or disk.
+class MemoryRefreshTokenStore implements RefreshTokenStore {
+  String? _value;
+  @override
+  Future<String?> read() async => _value;
+  @override
+  Future<void> write(String value) async {
+    _value = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    _value = null;
+  }
+}
+
 class RemoteHttpTransport implements AuthenticatedTransport {
-  RemoteHttpTransport(this.baseUrl, {http.Client? client, FlutterSecureStorage? storage})
-      : _client = client ?? http.Client(), _storage = storage ?? const FlutterSecureStorage();
+  RemoteHttpTransport(
+    this.baseUrl, {
+    http.Client? client,
+    FlutterSecureStorage? storage,
+    RefreshTokenStore? tokenStore,
+  }) : _client = client ?? http.Client(),
+       _tokens =
+           tokenStore ??
+           (kIsWeb
+               ? MemoryRefreshTokenStore()
+               : SecureRefreshTokenStore(storage)) {
+    final uri = Uri.parse(baseUrl);
+    if (uri.scheme != 'https' &&
+        !(uri.scheme == 'http' &&
+            ['localhost', '127.0.0.1', '10.0.2.2'].contains(uri.host))) {
+      throw ArgumentError('HTTPS required except local development loopback');
+    }
+  }
   final String baseUrl;
   final http.Client _client;
-  final FlutterSecureStorage _storage;
+  final RefreshTokenStore _tokens;
   String? _accessToken;
-  @override
-  Future<Map<String, dynamic>?> request(String method, String path, [Map<String, dynamic>? body, Map<String, String>? headers]) async {
-    final response = await _send(method, path, body, headers);
-    if (response.statusCode == 401 && !path.contains('/auth/')) {
-      final refreshToken = await _storage.read(key: 'tipkhun_refresh');
-      if (refreshToken != null) {
-        final refreshed = await _send('POST', '/api/v1/auth/refresh', {'refreshToken': refreshToken}, {'x-auth-client': 'mobile'});
-        if (refreshed.statusCode < 300) { _accessToken = (jsonDecode(refreshed.body) as Map<String, dynamic>)['accessToken'] as String?; return _decode(await _send(method, path, body, headers)); }
-      }
+  Future<void>? _refreshing;
+  void close() => _client.close();
+  Future<void> _accept(Map<String, dynamic> data) async {
+    final access = data['accessToken'], refresh = data['refreshToken'];
+    if (access is! String || refresh is! String) {
+      throw StateError('Incomplete remote session');
     }
-    final decoded = await _decode(response);
-    if (path.endsWith('/auth/login') && decoded?['refreshToken'] is String) {
-      await _storage.write(key: 'tipkhun_refresh', value: decoded!['refreshToken'] as String);
-    }
-    return decoded;
+    await _tokens.write(refresh);
+    _accessToken = access;
   }
-  Future<http.Response> _send(String method, String path, Map<String, dynamic>? body, Map<String, String>? headers) => _client.send(http.Request(method, Uri.parse('$baseUrl$path'))..headers.addAll({'content-type':'application/json', if (_accessToken != null) 'authorization':'Bearer $_accessToken', ...?headers})..body = body == null ? '' : jsonEncode(body)).then(http.Response.fromStream);
-  Future<Map<String, dynamic>?> _decode(http.Response response) async { if (response.statusCode >= 400) { throw StateError('Remote API request failed: ${response.statusCode}'); } if (response.body.isEmpty) return null; final value=jsonDecode(response.body); return value is Map<String,dynamic> ? value : {'items':value}; }
+
+  Future<void> _refresh() {
+    return _refreshing ??= (() async {
+      try {
+        final refresh = await _tokens.read();
+        if (refresh == null) throw StateError('Login required');
+        final response = await _send('POST', '/api/v1/auth/refresh', {
+          'refreshToken': refresh,
+        }, null);
+        final data = _decode(response);
+        await _accept(data!);
+      } catch (_) {
+        _accessToken = null;
+        await _tokens.clear();
+        rethrow;
+      }
+    })().whenComplete(() => _refreshing = null);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> request(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  ]) async {
+    if (path == '/api/v1/auth/refresh') {
+      await _refresh();
+      return null;
+    }
+    final sentAccess = _accessToken;
+    var response = await _send(method, path, body, headers);
+    if (response.statusCode == 401 &&
+        (!path.contains('/auth/') || path.endsWith('/logout'))) {
+      if (sentAccess == _accessToken) await _refresh();
+      response = await _send(method, path, body, headers);
+    }
+    final data = _decode(response);
+    if (path.endsWith('/auth/login')) await _accept(data!);
+    if (path.endsWith('/auth/logout')) {
+      _accessToken = null;
+      await _tokens.clear();
+    }
+    return data;
+  }
+
+  Future<http.Response> _send(
+    String method,
+    String path,
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  ) {
+    if (!path.startsWith('/api/v1/') || path.contains('://')) {
+      throw ArgumentError('Invalid API path');
+    }
+    final request = http.Request(method, Uri.parse('$baseUrl$path'));
+    request.headers.addAll({
+      'content-type': 'application/json',
+      'x-auth-client': 'mobile',
+      ...?headers,
+      if (_accessToken != null) 'authorization': 'Bearer $_accessToken',
+    });
+    if (body != null) request.body = jsonEncode(body);
+    return _client
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(const Duration(seconds: 15));
+  }
+
+  Map<String, dynamic>? _decode(http.Response response) {
+    if (response.statusCode >= 400) {
+      throw StateError('Remote API request failed: ${response.statusCode}');
+    }
+    if (response.body.isEmpty) return null;
+    final value = jsonDecode(response.body);
+    return value is Map<String, dynamic> ? value : {'items': value};
+  }
 }
 
 abstract interface class AllocationRepository {
@@ -101,14 +223,39 @@ abstract interface class AllocationRepository {
   Future<Map<String, dynamic>> confirm(String idempotencyKey);
   Future<List<Map<String, dynamic>>> history();
 }
+
 class RemoteAllocationRepository implements AllocationRepository {
-  RemoteAllocationRepository(this.transport); final AuthenticatedTransport transport;
-  @override Future<Map<String,dynamic>> settings() async => (await transport.request('GET','/api/v1/allocations/settings'))!;
-  @override Future<void> updateSettings(Map<String,dynamic> s) async { await transport.request('PUT','/api/v1/allocations/settings',s); }
-  @override Future<Map<String,dynamic>> available() async => (await transport.request('GET','/api/v1/allocations/available'))!;
-  @override Future<Map<String,dynamic>> preview([String? amountMinor]) async => (await transport.request('POST','/api/v1/allocations/preview', amountMinor == null ? {} : {'amountMinor':amountMinor}))!;
-  @override Future<Map<String,dynamic>> confirm(String key) async => (await transport.request('POST','/api/v1/allocations/confirm',{}, {'Idempotency-Key':key}))!;
-  @override Future<List<Map<String,dynamic>>> history() async => ((await transport.request('GET','/api/v1/allocations/history'))?['items'] as List? ?? const []).cast<Map<String,dynamic>>();
+  RemoteAllocationRepository(this.transport);
+  final AuthenticatedTransport transport;
+  @override
+  Future<Map<String, dynamic>> settings() async =>
+      (await transport.request('GET', '/api/v1/allocations/settings'))!;
+  @override
+  Future<void> updateSettings(Map<String, dynamic> s) async {
+    await transport.request('PUT', '/api/v1/allocations/settings', s);
+  }
+
+  @override
+  Future<Map<String, dynamic>> available() async =>
+      (await transport.request('GET', '/api/v1/allocations/available'))!;
+  @override
+  Future<Map<String, dynamic>> preview([String? amountMinor]) async =>
+      (await transport.request(
+        'POST',
+        '/api/v1/allocations/preview',
+        amountMinor == null ? {} : {'amountMinor': amountMinor},
+      ))!;
+  @override
+  Future<Map<String, dynamic>> confirm(String key) async =>
+      (await transport.request('POST', '/api/v1/allocations/confirm', {}, {
+        'Idempotency-Key': key,
+      }))!;
+  @override
+  Future<List<Map<String, dynamic>>> history() async =>
+      ((await transport.request('GET', '/api/v1/allocations/history'))?['items']
+                  as List? ??
+              const [])
+          .cast<Map<String, dynamic>>();
 }
 
 class RemoteAuthRepository implements AuthRepository {
@@ -137,7 +284,6 @@ class RemoteAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     await transport.request('POST', '/api/v1/auth/logout');
-    if (transport is RemoteHttpTransport) await (transport as RemoteHttpTransport)._storage.delete(key: 'tipkhun_refresh');
   }
 }
 
@@ -205,8 +351,10 @@ class RemoteTradingRepository implements TradingRepository {
   Future<List<Map<String, dynamic>>> trades() async => _list('/api/v1/trades');
   Future<List<Map<String, dynamic>>> _list(String path) async {
     final value = await transport.request('GET', path);
-    return ((value?['items'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    return ((value?['items'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
   }
+
   @override
   Future<Map<String, dynamic>> createOrder(
     Map<String, dynamic> order,
