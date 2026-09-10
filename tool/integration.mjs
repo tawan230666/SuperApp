@@ -17,6 +17,7 @@ const env = {
   RISK_SERVICE_URL: "http://127.0.0.1:13001",
   AUTH_SERVICE_URL: "http://127.0.0.1:13002",
   TRADING_SERVICE_URL: "http://127.0.0.1:13003",
+  ALLOCATION_SERVICE_URL: "http://127.0.0.1:13005",
 };
 const migrated = spawnSync(
   "pnpm",
@@ -31,12 +32,13 @@ const children = [
     env: { ...env, NODE_ENV: "development", RISK_PORT: "13001" },
     stdio: "inherit",
   }),
+  spawn("node",["services/allocation-service/dist/server.js"],{env:{...env,NODE_ENV:"development",ALLOCATION_PORT:"13005"},stdio:"inherit"}),
 ];
 try {
   let healthy = false;
   for (let i = 0; i < 30; i++) {
     try {
-      if ((await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok) {
+      if ((await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok && (await fetch("http://127.0.0.1:13005/ready")).ok) {
         healthy = true;
         break;
       }

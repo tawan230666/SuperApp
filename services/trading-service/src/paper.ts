@@ -2,13 +2,13 @@ import {createHash} from 'node:crypto';
 import {z} from 'zod';
 import {pool,transaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
-import {currentPlan,lockOwner,transitionOrder} from '@tipkhun/risk-data';
+import {currentPlan,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
 export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage']).default('fill')}).strict();
 const fee=(notional:bigint)=>(notional+999n)/1000n; // 10bps rounded up in minor units.
 export async function account(c:PoolClient,userId:string){return (await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[userId])).rows[0]??null;}
 async function ownedOrder(c:PoolClient,userId:string,id:string){const o=(await c.query("SELECT o.* FROM orders o JOIN accounts a ON a.id=o.account_id WHERE o.id=$1 AND a.user_id=$2 AND o.paper_order",[id,userId])).rows[0];if(!o)throw new HttpError(404,'Order not found');return o;}
 async function release(c:PoolClient,orderId:string){await c.query('UPDATE risk_reservations SET released_at=now() WHERE order_id=$1',[orderId]);}
-async function record(c:PoolClient,userId:string,action:string,entity:string,id:string,requestId:string){await audit(c,userId,action,entity,id,requestId);}
+async function record(c:PoolClient,userId:string,action:string,entity:string,id:string,requestId:string){await audit(c,userId,action,entity,id,requestId);const events:Record<string,string>={BOT_STARTED:'BOT_HEARTBEAT_MISSED',EMERGENCY_STOP:'EMERGENCY_STOP_TRIGGERED',ORDER_REJECTED:'ORDER_REJECTED',ORDER_FILLED:'POSITION_OPENED',POSITION_CLOSED:'POSITION_CLOSED'};if(events[action])await notify(c,userId,events[action],entity,id,{});}
 export class PaperBrokerAdapter {
  async fill(c:PoolClient,o:any,continuation=false){
   const existing=(await c.query('SELECT * FROM paper_broker_orders WHERE order_id=$1',[o.id])).rows[0];
@@ -46,7 +46,10 @@ export async function control(userId:string,action:string,requestId:string){
    a=(await c.query("INSERT INTO accounts(user_id,environment,initial_capital_minor,cash_minor) VALUES($1,'paper',$2,$2) RETURNING *",[userId,p.capitalMinor])).rows[0];
    await c.query('INSERT INTO paper_broker_accounts(account_id,initial_capital_minor) VALUES($1,$2)',[a.id,p.capitalMinor]);
    await c.query("INSERT INTO bot_sessions(account_id,state) VALUES($1,'READY')",[a.id]);
+   await ensureLedgerAccounts(c,userId,a.id);
+   await ledgerTransaction(c,userId,a.id,'OPENING_CAPITAL',a.id,'opening:'+a.id,[{bucket:'PAPER_CASH',direction:'DEBIT',amount:BigInt(p.capitalMinor)},{bucket:'TRADING_CAPITAL',direction:'CREDIT',amount:BigInt(p.capitalMinor)}]);
   }
+  await ensureLedgerAccounts(c,userId,a.id);
   const session=(await c.query('SELECT * FROM bot_sessions WHERE account_id=$1',[a.id])).rows[0];
   if(['start','resume'].includes(action)&&(a.emergency_stop||a.reconciliation_state!=='OK'))throw new HttpError(409,'Emergency stop or reconciliation is active');
   const targets:Record<string,string>={start:'RUNNING',pause:'PAUSED',resume:'RUNNING',stop:'STOPPED','emergency-stop':'EMERGENCY_STOPPED'};
@@ -98,6 +101,7 @@ export async function execute(userId:string,orderId:string,requestId:string,cont
   await transitionOrder(c,o,result.state,'Paper fill recorded');
   const position=(await c.query("INSERT INTO positions(account_id,order_id,instrument,quantity,cost_minor,state,entry_fees_minor) VALUES($1,$2,'SYNTHETIC-THB',$3,$4,'OPEN',$5) ON CONFLICT(order_id) DO UPDATE SET quantity=positions.quantity+EXCLUDED.quantity,cost_minor=positions.cost_minor+EXCLUDED.cost_minor,entry_fees_minor=positions.entry_fees_minor+EXCLUDED.entry_fees_minor RETURNING id",[a.id,o.id,result.qty.toString(),result.notional.toString(),result.fees.toString()])).rows[0];
   await c.query('UPDATE accounts SET cash_minor=cash_minor-$2,fees_minor=fees_minor+$3 WHERE id=$1',[a.id,(result.notional+result.fees).toString(),result.fees.toString()]);
+  await ledgerTransaction(c,userId,a.id,'PAPER_BUY',o.id,`buy:${o.id}:${result.filled.toString()}`,[{bucket:'TRADING_CAPITAL',direction:'DEBIT',amount:result.notional},{bucket:'PAPER_CASH',direction:'CREDIT',amount:result.notional},{bucket:'FEES',direction:'DEBIT',amount:result.fees},{bucket:'PAPER_CASH',direction:'CREDIT',amount:result.fees}]);
   await record(c,userId,'ORDER_FILLED','Order',o.id,requestId);if(BigInt(o.filled_quantity)===0n)await record(c,userId,'POSITION_OPENED','Position',position.id,requestId);
   return (await c.query('SELECT * FROM orders WHERE id=$1',[o.id])).rows[0];
  });}catch(e){if(e instanceof HttpError)throw e;
@@ -106,6 +110,8 @@ export async function execute(userId:string,orderId:string,requestId:string,cont
  }
 }
 export async function getOrder(userId:string,id:string){return transaction(c=>ownedOrder(c,userId,id));}
+export async function getPosition(userId:string,id:string){return transaction(async c=>{const r=(await c.query("SELECT p.* FROM positions p JOIN accounts a ON a.id=p.account_id WHERE p.id=$1 AND a.user_id=$2 AND a.environment='paper'",[id,userId])).rows[0];if(!r)throw new HttpError(404,'Position not found');return r;});}
+export async function getTrade(userId:string,id:string){return transaction(async c=>{const r=(await c.query("SELECT t.* FROM trades t JOIN accounts a ON a.id=t.account_id WHERE t.id=$1 AND a.user_id=$2 AND a.environment='paper'",[id,userId])).rows[0];if(!r)throw new HttpError(404,'Trade not found');return r;});}
 export async function cancelOrder(userId:string,id:string,requestId:string){return transaction(async c=>{await lockOwner(c,userId);const o=await ownedOrder(c,userId,id);await cancelLocked(c,userId,o,requestId);return o;});}
 export async function closePosition(userId:string,id:string,requestId:string){return transaction(async c=>{
  await lockOwner(c,userId);const p=(await c.query("SELECT p.* FROM positions p JOIN accounts a ON a.id=p.account_id WHERE p.id=$1 AND a.user_id=$2 AND a.environment='paper'",[id,userId])).rows[0];if(!p)throw new HttpError(404,'Position not found');
@@ -118,6 +124,11 @@ export async function closePosition(userId:string,id:string,requestId:string){re
  await c.query("UPDATE positions SET state='CLOSED' WHERE id=$1",[p.id]);
  const trade=(await c.query("INSERT INTO trades(account_id,plan_version_id,paper_order_id,net_pnl_minor,fees_minor,mode) VALUES($1,$2,$3,$4,$5,'paper') RETURNING *",[p.account_id,o.plan_version_id,o.id,net.toString(),(BigInt(p.entry_fees_minor)+fees).toString()])).rows[0];
  await c.query('UPDATE accounts SET cash_minor=cash_minor+$2,fees_minor=fees_minor+$3,realized_pnl_minor=realized_pnl_minor+$4 WHERE id=$1',[p.account_id,(proceeds-fees).toString(),fees.toString(),net.toString()]);
+ const pricePnl=proceeds-BigInt(p.cost_minor);
+ await ledgerTransaction(c,userId,p.account_id,'PAPER_SETTLEMENT',o.id,`settle:${o.id}`,[{bucket:'PAPER_CASH',direction:'DEBIT',amount:proceeds},{bucket:'TRADING_CAPITAL',direction:'CREDIT',amount:BigInt(p.cost_minor)},{bucket:'REALIZED_PROFIT',direction:pricePnl>=0n?'CREDIT':'DEBIT',amount:pricePnl>=0n?pricePnl:-pricePnl}]);
+ await ledgerTransaction(c,userId,p.account_id,'PAPER_EXIT_FEE',o.id,`exit-fee:${o.id}`,[{bucket:'FEES',direction:'DEBIT',amount:fees},{bucket:'PAPER_CASH',direction:'CREDIT',amount:fees}]);
+ const allFees=BigInt(p.entry_fees_minor)+fees;
+ if(allFees>0n) await ledgerTransaction(c,userId,p.account_id,'PAPER_FEE_TO_PNL',o.id,`fee-pnl:${o.id}`,[{bucket:'REALIZED_PROFIT',direction:'DEBIT',amount:allFees},{bucket:'FEES',direction:'CREDIT',amount:allFees}]);
  await transitionOrder(c,o,'CLOSED','Explicit paper position close confirmed');await release(c,o.id);await record(c,userId,'POSITION_CLOSED','Position',p.id,requestId);return trade;
 });}
 export async function reconcileLocked(c:PoolClient,a:any){
@@ -164,7 +175,12 @@ export async function status(userId:string){return transaction(async c=>{
   const p=(await c.query("SELECT coalesce(sum(quantity*101),0)::text AS value,coalesce(sum(quantity*101-cost_minor),0)::text AS unrealized,count(*)::int AS count FROM positions WHERE account_id=$1 AND state='OPEN'",[a.id])).rows[0];
  const pending=(await c.query("SELECT count(*)::int AS n FROM orders WHERE account_id=$1 AND paper_order AND state IN ('CREATED','RISK_CHECKED','SUBMITTED','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')",[a.id])).rows[0].n;
  const daily=(await c.query("SELECT coalesce(sum(net_pnl_minor),0)::text AS pnl FROM trades WHERE account_id=$1 AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",[a.id])).rows[0].pnl;
- return {mode:'PAPER',liveTrading:'LOCKED',state:b.state,paperAccountId:a.id,account:{cashMinor:a.cash_minor,equityMinor:(BigInt(a.cash_minor)+BigInt(p.value.split('.')[0])).toString(),realizedPnlMinor:a.realized_pnl_minor,unrealizedPnlMinor:p.unrealized,feesMinor:a.fees_minor},openPositions:p.count,pendingOrders:pending,dailyPnlMinor:daily,lastHeartbeat:b.last_heartbeat,strategyVersion:b.strategy_version,brokerStatus:reconciliation.status==='OK'?'PAPER_CONNECTED':'RECONCILIATION_REQUIRED',closePolicy:'Explicit close only; emergency does not liquidate'};
+ const stale=b.last_heartbeat&&Date.now()-new Date(b.last_heartbeat).getTime()>15000; return {mode:'PAPER',liveTrading:'LOCKED',state:b.state,healthStatus:reconciliation.status!=='OK'?'RECONCILIATION_REQUIRED':stale?'STALE':b.state==='RUNNING'?'HEALTHY':'DEGRADED',paperAccountId:a.id,account:{cashMinor:a.cash_minor,equityMinor:(BigInt(a.cash_minor)+BigInt(p.value.split('.')[0])).toString(),realizedPnlMinor:a.realized_pnl_minor,unrealizedPnlMinor:p.unrealized,feesMinor:a.fees_minor},openPositions:p.count,pendingOrders:pending,dailyPnlMinor:daily,lastHeartbeat:b.last_heartbeat,strategyVersion:b.strategy_version,brokerStatus:reconciliation.status==='OK'?'PAPER_CONNECTED':'RECONCILIATION_REQUIRED',closePolicy:'Explicit close only; emergency does not liquidate'};
 });}
 export async function heartbeat(){await pool.query("UPDATE bot_sessions SET last_heartbeat=now() WHERE state IN ('RUNNING','PAUSED') AND account_id IN (SELECT id FROM accounts WHERE environment='paper')");}
+export async function monitor(){
+ const stale=await pool.query("SELECT b.account_id,a.user_id FROM bot_sessions b JOIN accounts a ON a.id=b.account_id WHERE b.state='RUNNING' AND (b.last_heartbeat IS NULL OR b.last_heartbeat<now()-interval '15 seconds')");
+ for(const row of stale.rows) await transaction(async c=>{await c.query("UPDATE accounts SET reconciliation_state='RECONCILIATION_REQUIRED' WHERE id=$1",[row.account_id]);await c.query("UPDATE bot_sessions SET state='ERROR' WHERE account_id=$1",[row.account_id]);await notify(c,row.user_id,'BOT_HEARTBEAT_MISSED','BotSession',row.account_id,{health:'STALE'});});
+ const accounts=await pool.query("SELECT DISTINCT user_id FROM accounts WHERE environment='paper'");for(const row of accounts.rows) await reconcile(row.user_id).catch(()=>{});
+}
 export async function list(userId:string,kind:'orders'|'positions'|'trades'){return (await pool.query(`SELECT r.* FROM ${kind} r JOIN accounts a ON a.id=r.account_id WHERE a.user_id=$1 AND a.environment='paper' ORDER BY r.id LIMIT 200`,[userId])).rows;}

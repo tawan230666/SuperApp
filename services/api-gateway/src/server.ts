@@ -26,6 +26,10 @@ app.use(['/api/v1/bot','/api/v1/orders','/api/v1/positions','/api/v1/trades','/a
  try{const upstream=await fetch(`${process.env.TRADING_SERVICE_URL??'http://localhost:3003'}${req.originalUrl.replace('/api/v1','/v1')}`,{method:req.method,headers:{'content-type':'application/json',authorization:req.header('authorization')!,'idempotency-key':req.header('idempotency-key')??''},body:['GET','HEAD'].includes(req.method)?undefined:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});res.status(upstream.status).type('json').send(await upstream.text());}
  catch{res.status(503).json({error:'Trading service unavailable',requestId:res.locals.requestId});}
 });
+app.use(['/api/v1/allocations','/api/v1/ledger','/api/v1/notifications','/api/v1/portfolio','/api/v1/withdrawals'],authenticate(),async(req,res)=>{
+ try{const upstream=await fetch(`${process.env.ALLOCATION_SERVICE_URL??'http://localhost:3005'}${req.originalUrl.replace('/api/v1','/v1')}`,{method:req.method,headers:{'content-type':'application/json',authorization:req.header('authorization')!,'idempotency-key':req.header('idempotency-key')??''},body:['GET','HEAD'].includes(req.method)?undefined:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});res.status(upstream.status).type('json').send(await upstream.text());}
+ catch{res.status(503).json({error:'Allocation service unavailable',requestId:res.locals.requestId});}
+});
 app.use("/api/v1", riskRoutes());
 app.post("/api/v1/risk/check", authenticate(), async (req, res) => {
   try {

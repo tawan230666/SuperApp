@@ -17,9 +17,9 @@ services:
   api-gateway:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: api-gateway}}
     profiles: ["services"]
-    environment: ["NODE_ENV=development", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001", "AUTH_SERVICE_URL=http://auth-service:3002", "TRADING_SERVICE_URL=http://trading-service:3003", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    environment: ["NODE_ENV=development", "API_PORT=3000", "RISK_SERVICE_URL=http://risk-service:3001", "AUTH_SERVICE_URL=http://auth-service:3002", "TRADING_SERVICE_URL=http://trading-service:3003", "ALLOCATION_SERVICE_URL=http://allocation-service:3005", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
     ports: ["127.0.0.1:3000:3000"]
-    depends_on: {risk-service: {condition: service_healthy}, auth-service: {condition: service_healthy}, trading-service: {condition: service_healthy}}
+    depends_on: {risk-service: {condition: service_healthy}, auth-service: {condition: service_healthy}, trading-service: {condition: service_healthy}, allocation-service: {condition: service_healthy}}
   risk-service:
     build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: risk-service}}
     profiles: ["services"]
@@ -41,6 +41,13 @@ services:
     ports: ["127.0.0.1:3003:3003"]
     depends_on: {postgres: {condition: service_healthy}, risk-service: {condition: service_healthy}}
     healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3003/ready"], interval: 5s, timeout: 3s, retries: 10}
+  allocation-service:
+    build: {context: .., dockerfile: infra/node.Dockerfile, args: {SERVICE: allocation-service}}
+    profiles: ["services"]
+    environment: ["NODE_ENV=development", "ALLOCATION_PORT=3005", "DATABASE_URL=postgres://tipkhun:tipkhun_dev@postgres:5432/tipkhun"]
+    ports: ["127.0.0.1:3005:3005"]
+    depends_on: {postgres: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "wget", "-qO-", "http://localhost:3005/ready"], interval: 5s, timeout: 3s, retries: 10}
 volumes:
   tipkhun-postgres:
   tipkhun-redis:

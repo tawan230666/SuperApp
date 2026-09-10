@@ -216,6 +216,21 @@ export async function transitionOrder(c:PoolClient,order:{id:string;state:string
  await c.query('UPDATE orders SET state=$2 WHERE id=$1',[order.id,state]);
  await c.query('INSERT INTO order_events(order_id,from_state,to_state,reason) VALUES($1,$2,$3,$4)',[order.id,order.state,state,reason]);order.state=state;
 }
+const ledgerBuckets=['PAPER_CASH','TRADING_CAPITAL','REALIZED_PROFIT','FEES','LONG_TERM_RESERVE','WITHDRAWAL_RESERVE'] as const;
+export async function ensureLedgerAccounts(c:PoolClient,userId:string,accountId:string){
+ for(const bucket of ledgerBuckets) await c.query('INSERT INTO ledger_accounts(user_id,account_id,bucket) VALUES($1,$2,$3) ON CONFLICT(user_id,account_id,bucket) DO NOTHING',[userId,accountId,bucket]);
+}
+export async function ledgerTransaction(c:PoolClient,userId:string,accountId:string,type:string,referenceId:string|null,key:string,moves:Array<{bucket:string;direction:'DEBIT'|'CREDIT';amount:bigint}>){
+ const debit=moves.filter(x=>x.direction==='DEBIT').reduce((a,x)=>a+x.amount,0n),credit=moves.filter(x=>x.direction==='CREDIT').reduce((a,x)=>a+x.amount,0n);
+ if(debit<=0n||debit!==credit)throw new HttpError(400,'Unbalanced ledger transaction');
+ const existing=(await c.query('SELECT id FROM ledger_transactions WHERE idempotency_key=$1',[key])).rows[0]; if(existing)return existing.id;
+ const tx=(await c.query('INSERT INTO ledger_transactions(user_id,account_id,transaction_type,reference_entity,reference_id,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[userId,accountId,type,'paper',referenceId,key])).rows[0];
+ for(const m of moves){const a=(await c.query('SELECT id FROM ledger_accounts WHERE user_id=$1 AND account_id=$2 AND bucket=$3',[userId,accountId,m.bucket])).rows[0];if(!a)throw new HttpError(500,'Ledger account missing');await c.query('INSERT INTO ledger_entries(transaction_id,ledger_account_id,direction,amount_minor) VALUES($1,$2,$3,$4)',[tx.id,a.id,m.direction,m.amount.toString()]);}
+ return tx.id;
+}
+export async function notify(c:PoolClient,userId:string,eventType:string,entity:string|null,entityId:string|null,payload:unknown={}){
+ await c.query('INSERT INTO notifications(user_id,event_type,entity,entity_id,payload) VALUES($1,$2,$3,$4,$5)',[userId,eventType,entity,entityId,JSON.stringify(payload)]);
+}
 /** Only the Risk Service calls this endpoint; every value comes from owned rows. */
 export async function reservePaperOrder(userId:string,orderId:string,requestId:string){
  return transaction(async c=>{

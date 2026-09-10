@@ -15,6 +15,8 @@ const child = spawn(
     "@tipkhun/risk-service",
     "--filter",
     "@tipkhun/trading-service",
+    "--filter",
+    "@tipkhun/allocation-service",
     "dev",
   ],
   { stdio: "inherit", env: process.env },
