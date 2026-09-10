@@ -3,7 +3,7 @@ import {z} from 'zod';
 import {pool,transaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
 import {currentPlan,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
-export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage','profit','even']).default('fill')}).strict();
+export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage','profit','profit101','even']).default('fill')}).strict();
 const fee=(notional:bigint)=>(notional+999n)/1000n; // 10bps rounded up in minor units.
 export async function account(c:PoolClient,userId:string){return (await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[userId])).rows[0]??null;}
 async function ownedOrder(c:PoolClient,userId:string,id:string){const o=(await c.query("SELECT o.* FROM orders o JOIN accounts a ON a.id=o.account_id WHERE o.id=$1 AND a.user_id=$2 AND o.paper_order",[id,userId])).rows[0];if(!o)throw new HttpError(404,'Order not found');return o;}
@@ -67,7 +67,7 @@ export async function control(userId:string,action:string,requestId:string){
  });
 }
 export async function createOrder(userId:string,input:unknown,key:string,token:string,requestId:string){
- const d=orderSchema.parse(input);if(['profit','even'].includes(d.scenario)&&process.env.NODE_ENV!=='test'&&process.env.TEST_MODE!=='1')throw new HttpError(400,'Test price scenario is disabled');if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
+ const d=orderSchema.parse(input);if(['profit','profit101','even'].includes(d.scenario)&&process.env.NODE_ENV!=='test'&&process.env.TEST_MODE!=='1')throw new HttpError(400,'Test price scenario is disabled');if(!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new HttpError(400,'Idempotency-Key (8-128 safe characters) required');
  const hash=createHash('sha256').update(JSON.stringify(d)).digest('hex');
  const o=await transaction(async c=>{
   await lockOwner(c,userId);const a=await account(c,userId);if(!a)throw new HttpError(409,'Start paper account first');
@@ -118,7 +118,7 @@ export async function closePosition(userId:string,id:string,requestId:string){re
  if(p.state==='CLOSED')return (await c.query('SELECT * FROM trades WHERE paper_order_id=$1',[p.order_id])).rows[0];
  const o=await ownedOrder(c,userId,p.order_id);if(o.state==='UNKNOWN')throw new HttpError(409,'Unknown outcome requires reconciliation before closing');
  if(o.state==='PARTIALLY_FILLED')await cancelLocked(c,userId,o,requestId);
- const quantity=BigInt(String(p.quantity).split('.')[0]),price=o.scenario==='profit'?120n:o.scenario==='even'?101n:99n,proceeds=quantity*price,fees=fee(proceeds),net=proceeds-BigInt(p.cost_minor)-BigInt(p.entry_fees_minor)-fees;
+ const quantity=BigInt(String(p.quantity).split('.')[0]),price=o.scenario==='profit'?120n:o.scenario==='profit101'?204n:o.scenario==='even'?101n:99n,proceeds=quantity*price,fees=fee(proceeds),net=proceeds-BigInt(p.cost_minor)-BigInt(p.entry_fees_minor)-fees;
  await c.query("INSERT INTO paper_broker_fills(order_id,side,quantity,price_minor,fee_minor) VALUES($1,'SELL',$2,$3,$4)",[o.id,quantity.toString(),price.toString(),fees.toString()]);
  await c.query("UPDATE paper_broker_orders SET state='CLOSED' WHERE order_id=$1",[o.id]);
  await c.query("UPDATE positions SET state='CLOSED' WHERE id=$1",[p.id]);
