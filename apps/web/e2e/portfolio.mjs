@@ -19,7 +19,7 @@ try{
   await page.getByRole('button',{name:'ดู Preview',exact:true}).click();await page.getByRole('button',{name:'ยืนยันบันทึก',exact:true}).click();await page.getByText('บันทึกแล้ว',{exact:true}).waitFor();
   await page.goto(`${base}/bot`);await page.getByRole('button',{name:'START',exact:true}).click();await page.getByText('RUNNING',{exact:true}).waitFor();
   await api('POST','/orders',{instrument:'SYNTHETIC-THB',type:'MARKET',quantity:'10',scenario:'profit101'},`browser-trade-${Date.now()}`);
-  const position=(await api('GET','/positions'))[0];const closed=await api('POST',`/positions/${position.id}/close`,{});assert.equal(closed.net_pnl_minor,'1025');
+  const position=(await api('GET','/positions'))[0];const closed=await api('POST',`/positions/${position.id}/close`,{});assert.equal(closed.net_pnl_minor,'1025');await api('POST','/bot/stop',{});
   await page.goto(`${base}/profit-router`);await page.getByRole('button',{name:'PREVIEW',exact:true}).click();await page.getByRole('button',{name:'CONFIRM',exact:true}).click();await page.getByText('ยืนยันการจัดสรรแล้ว',{exact:true}).waitFor();
   fixture.allocationId=(await api('GET','/allocations/history'))[0].id;
   await page.goto(`${base}/long-term`);await page.getByRole('heading',{name:'Long-Term Portfolio',exact:true}).waitFor();await page.getByTestId('Long-Term Reserve Available').filter({hasText:'3.07 THB'}).waitFor();
@@ -28,6 +28,7 @@ try{
   assert.equal((await api('GET','/portfolio/holdings')).length,0);
   await page.getByRole('button',{name:'Confirm paper order',exact:true}).click();await page.getByText('Paper BUY filled',{exact:true}).waitFor();await page.getByTestId('holding-PTT').filter({hasText:'10.000000'}).waitFor();
   fixture.holdingId=(await api('GET','/portfolio/holdings'))[0].id;
+  assert.equal((await api('GET','/portfolio/performance')).length,0);await page.getByRole('button',{name:'Record snapshot',exact:true}).click();await page.getByText('Snapshot recorded',{exact:true}).waitFor();assert.equal((await api('GET','/portfolio/performance')).length,1);
   await api('PUT','/market/test-scenario',{symbol:'PTT',scenario:'up'});await page.reload();await page.getByTestId('Unrealized P&L').filter({hasText:'0.19 THB'}).waitFor();
   await page.getByRole('button',{name:'Save targets',exact:true}).click();await page.getByText('Targets saved',{exact:true}).waitFor();
   writeFileSync(fixturePath,JSON.stringify(fixture),{mode:0o600});

@@ -1,3 +1,4 @@
+import {createHmac} from 'node:crypto';
 import { baseApp, authenticate, finish } from "@tipkhun/auth";
 import { riskRoutes } from "@tipkhun/risk-data";
 export const app = baseApp("api-gateway");
@@ -33,6 +34,14 @@ app.use(['/api/v1/portfolio','/api/v1/watchlist','/api/v1/market'],authenticate(
 app.use(['/api/v1/allocations','/api/v1/ledger','/api/v1/notifications','/api/v1/withdrawals'],authenticate(),async(req,res)=>{
  try{const upstream=await fetch(`${process.env.ALLOCATION_SERVICE_URL??'http://localhost:3005'}${req.originalUrl.replace('/api/v1','/v1')}`,{method:req.method,headers:{'content-type':'application/json',authorization:req.header('authorization')!,'idempotency-key':req.header('idempotency-key')??'','x-request-id':res.locals.requestId},body:['GET','HEAD'].includes(req.method)?undefined:JSON.stringify(req.body??{}),signal:AbortSignal.timeout(10000)});res.status(upstream.status).type('json').send(await upstream.text());}
  catch{res.status(503).json({error:'Allocation service unavailable',requestId:res.locals.requestId});}
+});
+app.use('/api/v1/copilot',authenticate(),async(req,res)=>{
+ const secret=process.env.AI_GATEWAY_SECRET;
+ if(!secret||secret.length<64){res.status(503).json({error:'AI unavailable'});return;}
+ const path=req.originalUrl.replace('/api/v1','/v1'),body=JSON.stringify(req.body??{});
+ const identity=Buffer.from(JSON.stringify({aud:'ai-copilot',userId:res.locals.identity.id,requestId:res.locals.requestId,expires:Date.now()+15000,method:req.method,path,body})).toString('base64url');
+ try{const upstream=await fetch(`${process.env.AI_SERVICE_URL??'http://127.0.0.1:3007'}${path}`,{method:req.method,headers:{'content-type':'application/json','x-ai-identity':identity,'x-ai-signature':createHmac('sha256',secret).update(identity).digest('hex')},body:['GET','HEAD'].includes(req.method)?undefined:body,signal:AbortSignal.timeout(15000)});res.status(upstream.status).type('json').send(await upstream.text());}
+ catch{res.status(503).json({error:'AI unavailable',requestId:res.locals.requestId});}
 });
 app.use("/api/v1", riskRoutes());
 app.post("/api/v1/risk/check", authenticate(), async (req, res) => {

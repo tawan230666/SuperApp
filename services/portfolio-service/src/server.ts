@@ -1,7 +1,7 @@
 import {baseApp,authenticate,finish,HttpError,audit} from '@tipkhun/auth';
 import {pool,transaction} from '@tipkhun/database';
 import {z} from 'zod';
-import {ensure,cashView,mutate,preview,valuation,history} from './portfolio.js';
+import {ensure,cashView,mutate,preview,valuation,history,captureSnapshot,reconcilePortfolio} from './portfolio.js';
 import {provider,testMarketEnabled} from './market.js';
 const app=baseApp('portfolio-service',async()=>{await pool.query('SELECT id FROM portfolios LIMIT 0');await pool.query('SELECT id FROM assets LIMIT 0');});
 app.use('/v1',authenticate());
@@ -16,8 +16,10 @@ app.post('/v1/portfolio/orders/preview',async(q,r)=>{try{r.json(await preview(ui
 app.post('/v1/portfolio/orders',async(q,r)=>{try{r.status(201).json(await mutate(uid(r),key(q),order.parse(q.body),r.locals.requestId));}catch(e){await event(uid(r),r.locals.requestId,e);throw e;}});
 app.get('/v1/portfolio/orders',async(_q,r)=>r.json(await history(uid(r),'orders')));
 app.get('/v1/portfolio',async(_q,r)=>r.json(await valuation(uid(r),r.locals.requestId)));
+app.post('/v1/portfolio/snapshots',async(q,r)=>{z.object({}).strict().parse(q.body??{});r.status(201).json(await captureSnapshot(uid(r),r.locals.requestId));});
+app.post('/v1/portfolio/reconcile',async(q,r)=>{z.object({}).strict().parse(q.body??{});r.json(await reconcilePortfolio(uid(r),r.locals.requestId));});
 app.get('/v1/portfolio/holdings',async(_q,r)=>r.json((await valuation(uid(r),r.locals.requestId)).holdings));
-app.get('/v1/portfolio/performance',async(_q,r)=>{await valuation(uid(r),r.locals.requestId);r.json(await history(uid(r),'snapshots'));});
+app.get('/v1/portfolio/performance',async(_q,r)=>{r.json(await history(uid(r),'snapshots'));});
 app.get('/v1/portfolio/targets',async(_q,r)=>r.json((await valuation(uid(r),r.locals.requestId)).targets));
 app.put('/v1/portfolio/targets',async(q,r)=>{
  const d=z.object({targets:z.array(z.object({target:symbol,weightBps:z.number().int().min(0).max(10000)}).strict()).min(1).max(50),concentrationLimitBps:z.number().int().min(1).max(10000).optional()}).strict().refine(x=>x.targets.reduce((a,t)=>a+t.weightBps,0)===10000&&new Set(x.targets.map(t=>t.target)).size===x.targets.length).parse(q.body);

@@ -1,3 +1,7 @@
+# Phase 6 read-path update
+
+All Portfolio GET routes now read without initializing records, reconciling or capturing snapshots. Performance returns existing observations. Use authenticated `POST /api/v1/portfolio/snapshots` (UI: Record snapshot) to capture an observation and `POST /api/v1/portfolio/reconcile` to explicitly check/latch reconciliation. Read responses show stored reconciliation status with `reconciliationVerified: false`. Funding/order execution retains its existing locked reconciliation checks. See [AI_COPILOT.md](AI_COPILOT.md).
+
 # Paper long-term portfolio
 
 Phase 5 extends the existing PostgreSQL ledger and authenticated Gateway. No live execution, deposits, withdrawals, external market feed or AI is enabled.

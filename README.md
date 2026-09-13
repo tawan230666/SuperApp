@@ -1,3 +1,5 @@
+> Phase 6 continuation (2026-09-11): local Mock Financial Copilot with restricted DB credentials, READ ONLY financial context, append-only AI history and React `/assistant`. Portfolio GETs no longer capture snapshots; use Record snapshot explicitly. See [AI_COPILOT.md](docs/AI_COPILOT.md) and [PROGRESS.md](docs/PROGRESS.md). Full Phase 6 completion is pending comparison with the original acceptance prompt.
+
 # Tipkhun Capital
 
 แอปวางแผนความเสี่ยง บันทึกเทรด จัดสรรกำไร และทดลอง Paper Trading จาก **Flutter codebase เดียวสำหรับ Android, iOS และ Web** ไม่มีเงินจริงหรือการรับประกันผลตอบแทน

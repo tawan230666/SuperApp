@@ -1,0 +1,9 @@
+import {type ReadQuery} from './types.js';
+export async function readBotStatus(c:ReadQuery,userId:string){
+ const a=(await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[userId])).rows[0];if(!a)return {mode:'PAPER',liveTrading:'LOCKED',state:'READY',account:null,brokerStatus:'NOT_STARTED'};
+ const reconciliation={status:a.reconciliation_state};const b=(await c.query('SELECT * FROM bot_sessions WHERE account_id=$1',[a.id])).rows[0]??{state:'READY',last_heartbeat:null,strategy_version:null};
+  const p=(await c.query("SELECT coalesce(sum(quantity*101),0)::text AS value,coalesce(sum(quantity*101-cost_minor),0)::text AS unrealized,count(*)::int AS count FROM positions WHERE account_id=$1 AND state='OPEN'",[a.id])).rows[0];
+ const pending=(await c.query("SELECT count(*)::int AS n FROM orders WHERE account_id=$1 AND paper_order AND state IN ('CREATED','RISK_CHECKED','SUBMITTED','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')",[a.id])).rows[0].n;
+ const daily=(await c.query("SELECT coalesce(sum(net_pnl_minor),0)::text AS pnl FROM trades WHERE account_id=$1 AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",[a.id])).rows[0].pnl;
+ const stale=b.last_heartbeat&&Date.now()-new Date(b.last_heartbeat).getTime()>15000; return {mode:'PAPER',liveTrading:'LOCKED',state:b.state,healthStatus:reconciliation.status!=='OK'?'RECONCILIATION_REQUIRED':stale?'STALE':b.state==='RUNNING'?'HEALTHY':'DEGRADED',paperAccountId:a.id,account:{cashMinor:a.cash_minor,equityMinor:(BigInt(a.cash_minor)+BigInt(p.value.split('.')[0])).toString(),realizedPnlMinor:a.realized_pnl_minor,unrealizedPnlMinor:p.unrealized,feesMinor:a.fees_minor},openPositions:p.count,pendingOrders:pending,dailyPnlMinor:daily,lastHeartbeat:b.last_heartbeat,strategyVersion:b.strategy_version,brokerStatus:reconciliation.status==='OK'?'PAPER_CONNECTED':'RECONCILIATION_REQUIRED',closePolicy:'Explicit close only; emergency does not liquidate'};
+}

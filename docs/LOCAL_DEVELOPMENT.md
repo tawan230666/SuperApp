@@ -1,3 +1,7 @@
+# Local Copilot runtime (Phase 6)
+
+Run `pnpm db:migrate` before `pnpm dev`. The launcher provisions a temporary restricted AI login, starts AI on loopback port 3007, and drops the login on shutdown. It does not pass DATABASE_URL, user tokens or other service URLs to AI. The Gateway signs AI-only request assertions. This requires local DB role-administration rights in the launcher; AI itself has none. No external AI provider/key is used. Existing Compose service profile excludes AI; use this launcher for Copilot. See [AI_COPILOT.md](AI_COPILOT.md).
+
 # Local development
 
 This repository now contains the Flutter app plus a TypeScript monorepo foundation. Flutter remains at the repository root during a safe, staged migration; moving it to `apps/mobile` is deferred until Android/iOS configuration is copied and verified.

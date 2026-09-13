@@ -1,3 +1,4 @@
+import {provisionAI,aiEnvironment} from './ai-runtime.mjs';
 import {requireFreePorts} from './test-ports.mjs';
 import { existsSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -28,8 +29,11 @@ const migrated = spawnSync(
   { env, stdio: "inherit" },
 );
 if (migrated.status !== 0) process.exit(1);
-await requireFreePorts([13000,13001,13002,13003,13005,13006,13007,13008]);
+await requireFreePorts([13000,13001,13002,13003,13005,13006,13007,13008,13009]);
+const aiRuntime=await provisionAI(url);
+env.AI_GATEWAY_SECRET=aiRuntime.secret;env.AI_SERVICE_URL='http://127.0.0.1:13009';env.AI_DATABASE_URL=aiRuntime.databaseUrl;
 const children = [
+  spawn('node',['services/ai-service/dist/server.js'],{env:aiEnvironment({...env,NODE_ENV:'development'},aiRuntime,13009),stdio:'inherit'}),
   spawn("node",["services/portfolio-service/dist/server.js"],{env:{...env,NODE_ENV:"development",PORTFOLIO_PORT:"13006"},stdio:"inherit"}),
   spawn("node",["services/api-gateway/dist/server.js"],{env:{...env,NODE_ENV:"development",API_PORT:"13000"},stdio:"inherit"}),
   spawn("node",["services/trading-service/dist/server.js"],{env:{...env,NODE_ENV:"development",TRADING_PORT:"13003"},stdio:"inherit"}),
@@ -44,7 +48,7 @@ try {
   let healthy = false;
   for (let i = 0; i < 150; i++) {
     try {
-      if ((await fetch("http://127.0.0.1:13006/ready")).ok && (await fetch("http://127.0.0.1:13000/ready")).ok && (await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok && (await fetch("http://127.0.0.1:13005/ready")).ok) {
+      if ((await fetch("http://127.0.0.1:13009/ready")).ok && (await fetch("http://127.0.0.1:13006/ready")).ok && (await fetch("http://127.0.0.1:13000/ready")).ok && (await fetch("http://127.0.0.1:13001/ready")).ok && (await fetch("http://127.0.0.1:13002/ready")).ok && (await fetch("http://127.0.0.1:13003/ready")).ok && (await fetch("http://127.0.0.1:13005/ready")).ok) {
         healthy = true;
         break;
       }
@@ -60,7 +64,7 @@ try {
       "exec",
       "vitest",
       "run",
-      process.argv[2] === "portfolio" ? "src/portfolio.integration.test.ts" : process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
+      process.argv[2] === "ai" ? "src/ai.integration.test.ts" : process.argv[2] === "portfolio" ? "src/portfolio.integration.test.ts" : process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
     ],
     { env, stdio: "inherit" },
   );
@@ -69,5 +73,6 @@ try {
   console.error(e.message);
   process.exitCode = 1;
 } finally {
-  for (const child of children) child.kill("SIGTERM");
+  await Promise.all(children.map(child=>new Promise(resolve=>{if(child.exitCode!==null||child.signalCode!==null)return resolve();child.once('exit',resolve);child.kill('SIGTERM');})));
+  await aiRuntime.close();
 }

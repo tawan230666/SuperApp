@@ -9,14 +9,8 @@ import { rateLimit } from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { pool, transaction, ready, type PoolClient } from "@tipkhun/database";
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+import {FinancialReadError as HttpError} from '@tipkhun/financial-read';
+export {HttpError};
 export const hashToken = (token: string) =>
   crypto.createHash("sha256").update(token).digest("hex");
 import { authCredentialsSchema as credentials } from "@tipkhun/contracts";

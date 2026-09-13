@@ -1,3 +1,7 @@
+# Phase 6 additions
+
+Authenticated Gateway endpoints: `GET /api/v1/copilot/context`, `POST /api/v1/copilot/query` with strict `{question:string}`, and `GET /api/v1/copilot/decisions`. Only query creates AI decision/audit rows. No AI execution endpoint. Portfolio GETs and Bot status GET are side-effect free; explicit `POST /api/v1/portfolio/snapshots` captures a snapshot and `POST /api/v1/portfolio/reconcile` checks reconciliation. Existing `POST /api/v1/reconcile` remains the Bot reconciliation operation. See [AI_COPILOT.md](AI_COPILOT.md).
+
 # API contract (v1 foundation)
 
 The gateway listens on `http://localhost:3000` and exposes a versioned REST surface. All request bodies are untrusted and must be parsed at the service boundary with Zod. Responses never contain secrets.
@@ -117,3 +121,8 @@ All routes below require Bearer authentication and derive owner from that sessio
 | DELETE | /api/v1/watchlist/:symbol | Remove own watchlist item |
 
 Errors include 400 invalid input, 401 auth, 404 unknown asset, 409 INSUFFICIENT_RESERVE / INSUFFICIENT_CASH / INSUFFICIENT_HOLDINGS / IDEMPOTENCY_CONFLICT / MARKET_DATA_STALE / RECONCILIATION_REQUIRED, and 503 MARKET_DATA_UNAVAILABLE. Execution confirm revalidates a fresh price and balances; previews are estimates, not reserved quotes. GET valuation/performance creates an actual snapshot; order preview never posts ledger entries. Test-only market control and production guards are documented in MARKET_DATA.md. Live trading remains LOCKED.
+# Phase 6 Copilot API
+
+`GET /api/v1/copilot/context` returns owner-scoped server financial context, persisted trading/profit aggregates, provenance and category freshness. `POST /api/v1/copilot/query` accepts strict `{question, copilotMode?}` where mode is one of `PORTFOLIO_REVIEW`, `RISK_REVIEW`, `TRADING_REVIEW`, `PROFIT_REVIEW`, `DAILY_SUMMARY`, or `ASK_FINANCIAL_QUESTION`. `GET /api/v1/copilot/decisions` returns the latest 50 owned persisted decisions. The query response is schema-validated before its append-only decision/audit record is saved.
+
+No Copilot route authorizes or performs financial execution. Execution-shaped questions are refused; provider failure returns an unavailable response and does not create history.

@@ -1,3 +1,48 @@
+# Continuation — 2026-09-13
+
+Resolved the unfinished AI provider/context TypeScript mismatch. Context now reads full owner-scoped trade count/net P&L and allocation totals in the existing READ ONLY transaction; monetary sums remain decimal strings. Removed references to nonexistent freshness metadata and explicitly disclose that per-category freshness is unavailable.
+
+The query route now uses the data-only AIProvider interface with a 5-second health/generation deadline and strict output validation before saving history. Malformed, unavailable, timed-out, execution-authorizing or provenance/mode-mismatched responses fail closed. Optional `copilotMode` accepts the six declared labels and defaults to `ASK_FINANCIAL_QUESTION`; mode-specific analysis is still pending (all currently use the existing deterministic summary). Provider fixtures are never selected by client input. A deadline stops waiting; it does not claim to terminate arbitrary future provider work.
+
+Verification: workspace `pnpm build`, `pnpm lint`, and `pnpm test:unit` passed; AI boundary suite is 11 passing tests, including six new cases. Added two database integration cases for owned aggregates and request modes; these are NOT runtime-verified. `node tool/integration.mjs ai` failed in migration setup before test cases ran. Docker socket is absent and `open -a Docker` reports no such application. Browser acceptance was not rerun because its database prerequisite is unavailable. Flutter was unchanged and not retested.
+
+Remaining: restore a reachable dedicated test database, run full integration/browser acceptance, obtain the original Phase 6 acceptance specification, then close its remaining context/provenance, mode-specific review, API/UI, Flutter, history and audit gaps. Phase 6 is still PARTIAL. No checkpoint recovery, commit, push or deployment performed; source has no `.git` and the previously recorded temporary recovery checkout is absent.
+
+---
+
+# Phase 6 continuation — 2026-09-11
+
+**Safety boundary implemented and verified. Full Phase 6 acceptance awaits the original prompt/checklist, which was not available in this workspace or conversation.** Phase 2–5 remain completed historical milestones; the separately authorized Phase 6 work below supersedes the old “AI locked / stop after Phase 5” statements.
+
+Implemented read-only Portfolio valuation/cash/history and Bot status projections in `@tipkhun/financial-read`; READ ONLY repeatable-read transactions; explicit Portfolio snapshot and reconciliation operations; restricted AI database role; immutable owned AI decisions/audits; signed Gateway assertions without user bearer tokens in AI; deterministic local Mock Copilot context/analysis/history APIs and React `/assistant`. No execution or Risk override tools exist. Existing Trading/Risk/Ledger/Allocation/Portfolio execution authority is retained. Details and limits: [AI_COPILOT.md](AI_COPILOT.md).
+
+The browser Portfolio now captures observations only through Record snapshot. GET/reload and AI context reads do not initialize financial entities, write snapshots, reconcile UNKNOWN broker evidence, change bot/account state, create orders, change risk plans/ledger, allocate profit or BUY/SELL holdings. Concurrent explicit workers remain separate authorized actors.
+
+## Final verification for the delivered scope
+
+| Suite | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Node/React unit (including 5 AI boundary and 2 Copilot UI cases) | 41 | 0 | 0 |
+| Phase 2 integration | 27 | 0 | 0 |
+| Paper/ledger/allocation integration | 25 | 0 | 0 |
+| Portfolio integration | 17 | 0 | 0 |
+| AI restricted-role integration | 16 | 0 | 0 |
+| Real browser scripts/flows | 4 | 0 | 0 |
+| Flutter unit/widget/repository | 53 | 0 | 0 |
+| Flutter real shared-backend acceptance | 1 | 0 | 0 |
+
+Final `pnpm lint`, `pnpm test` (build + 41 unit + **85 integration**), `pnpm test:browser`, `flutter analyze --no-pub` and `flutter test --no-pub` passed. The browser suite includes actual restricted AI analysis, execution refusal, history/reload, mobile width/logout, explicit snapshot capture, and existing React → Flutter → React portfolio persistence. Package passWithNoTests results add zero coverage. Expected unauthenticated refresh 401 checks are not test failures.
+
+Migration 011 applied to development and dedicated test databases; repeated migrations passed without resets/deletions. Runtime test logins were removed after shutdown (zero `ai_runtime_*` roles remaining). High-confidence secret scan and Git whitespace checks passed for the enumerated changed source files. No local `.env`, credential or generated artifact is included in the checkpoint.
+
+Initial regression attempts found one transient Paper order left at CREATED before a test dereferenced its missing position, and a Playwright exact-text selector that included the nested source caption. The Paper test now asserts order success/state before reading the position; its targeted rerun and final full run both passed. The original transient's cause was not established and is not claimed fixed. UI value/source spans were separated, and the final real-browser suite passed.
+
+Pre-change source archive: `/private/tmp/tipkhun-phase6-safe-20260911/source.tar`, excluding secrets/build caches. Baseline publishing checkpoint: `ce12d23` on `feature/platform-architecture`. Source workspace still has no `.git`; only enumerated changed source/config/test/docs files are synchronized to the existing local publishing checkout. No remote push or production deployment is part of this continuation.
+
+Model recommendation issued after the 14-case initial DB safety suite passed: **MODEL DOWNGRADE RECOMMENDED — gpt-6-astra medium** for remaining routine UI/test/docs. No model or model configuration was changed.
+
+---
+
 # Current status — 2026-09-11
 
 Phase 2 = COMPLETED. Phase 3 = COMPLETED. Phase 4 = COMPLETED.
@@ -244,3 +289,6 @@ data; production mode rejects those controls. Full acceptance passed: Phase 2
 27/27, Paper/ledger/allocation integration 25/25, browser E2E including profit
 allocation, React unit 7/7, Flutter 49/49, lint and build, with zero failed and
 zero skipped acceptance tests.
+# Phase 6 — COMPLETED — 2026-09-13
+
+Authoritative acceptance is complete. Database infrastructure is available through the existing Docker Compose PostgreSQL/Redis services with preserved volumes and a separate `tipkhun_test` database. Migrations 001–011 are applied. AI Provider abstraction, six Copilot modes, category freshness/provenance, strict structured output validation, timeout/unavailable/malformed failure handling, React Assistant, Flutter `RemoteAIRepository`, and shared PostgreSQL AI history are verified. Full AI integration, DB permission, prompt-injection, real browser and Flutter shared-backend acceptance passed with failed=0 and skipped=0. See `PHASE6_ACCEPTANCE_AUDIT.md` for the exact evidence.

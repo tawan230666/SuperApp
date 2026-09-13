@@ -1,3 +1,4 @@
+import {AssistantPage} from './AssistantPage';
 import {PortfolioPage} from "./PortfolioPage";
 import { AuthProvider, useAuth } from "./auth";
 import { AuthPage, LiveDashboard, RiskSettings } from "./AccountPages";
@@ -277,41 +278,6 @@ function Trades() {
     </>
   );
 }
-function Assistant() {
-  return (
-    <>
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">READ-ONLY COPILOT</span>
-          <h2>ผู้ช่วยวางแผน</h2>
-          <p>ตอบจากข้อมูลที่ได้รับอนุญาต และบอกเมื่อข้อมูลไม่เพียงพอ</p>
-        </div>
-      </div>
-      <section className="chat">
-        <div className="chat-intro">
-          <span className="mark large">T</span>
-          <h3>Tipkhun AI Agent</h3>
-          <span className="pill muted">OFFLINE</span>
-          <p>
-            ยังไม่มี AI API หรือ market data provider การตอบจะใช้
-            LocalAssistantService เมื่อเชื่อม session
-          </p>
-        </div>
-        <div className="chat-empty">
-          <Empty>
-            เริ่มถามเรื่องงบความเสี่ยง สถานะ Paper หรือกำไรที่รับรู้
-          </Empty>
-        </div>
-        <div className="composer">
-          <input disabled placeholder="ถาม Copilot (ยังไม่เชื่อมต่อ Backend)" />
-          <button disabled className="button primary">
-            ส่ง
-          </button>
-        </div>
-      </section>
-    </>
-  );
-}
 function ProtectedApp() {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -355,7 +321,7 @@ function ProtectedApp() {
             <PortfolioPage />
           }
         />
-        <Route path="/assistant" element={<Assistant />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route
           path="/settings"
           element={

@@ -1,3 +1,7 @@
+# Phase 6 safety boundary — 2026-09-11
+
+Local Mock Copilot now has a separate restricted database login, signed Gateway identity without user bearer tokens, READ ONLY context transactions, no execution tools, and append-only AI history. See [AI_COPILOT.md](AI_COPILOT.md) for enforcement, limitations and tests. Historical sections below describe earlier milestones; AI is no longer entirely locked, but external/paid AI and all live execution remain locked.
+
 # Security — Phase 2 implementation / validation pending
 
 The system remains Simulation/Paper only. Live trading, production deployment,
@@ -90,3 +94,6 @@ Test price controls require non-production NODE_ENV, explicit flags, and a `_tes
 Flutter uses memory access credentials and OS secure refresh storage on native targets. Browser transport defaults to an ephemeral memory refresh store. An injected memory store supports tests without mocking HTTP. Successful refresh saves both new tokens before retry; concurrent 401s share one rotation; invalid refresh clears state; logout clears credentials. No SharedPreferences token, credential logs, or persistent browser localStorage token. HTTP is allowed only on local loopback/emulator hosts; all other servers require HTTPS.
 
 The acceptance harness creates only temporary test-account credentials (no access/refresh tokens) in a private shared fixture directory, removes that directory on completion, and never commits it. Database .env files remain ignored. Native keychain behavior on physical devices has not been device-tested; plugin-backed storage and real HTTP transport are separate verification boundaries.
+# Phase 6 security review
+
+The AI runtime uses an ephemeral login inheriting only `tipkhun_ai`; it receives no owner `DATABASE_URL`. Runtime checks reject missing or inherited privileged credentials, unsafe role flags, unexpected memberships, financial write grants, credential-table reads, and executable security-definer routines. Integration tests verify owner isolation, every financial write denial, role escalation denial, read-only transaction enforcement, immutable AI history, and absence of bearer/cookie forwarding.

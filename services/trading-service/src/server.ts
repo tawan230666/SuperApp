@@ -16,7 +16,7 @@ app.post('/v1/orders/:id/cancel',async(req,res)=>res.json(await cancelOrder(res.
 app.post('/v1/orders/:id/continue',async(req,res)=>res.json(await execute(res.locals.identity.id,id(req.params.id),res.locals.requestId,true)));
 app.post('/v1/positions/:id/close',async(req,res)=>res.json(await closePosition(res.locals.identity.id,id(req.params.id),res.locals.requestId)));
 app.post('/v1/reconcile',async(_req,res)=>res.json(await reconcile(res.locals.identity.id)));
-app.get('/v1/reconciliation',async(_req,res)=>res.json(await reconcile(res.locals.identity.id)));
+app.get('/v1/reconciliation',async(_req,res)=>res.json({brokerStatus:(await status(res.locals.identity.id)).brokerStatus,verified:false}));
 finish(app);
 if(process.env.NODE_ENV!=='test'){
  await recover();await heartbeat();

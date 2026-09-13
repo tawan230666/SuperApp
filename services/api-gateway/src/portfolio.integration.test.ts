@@ -37,7 +37,9 @@ describe('Phase 5 real HTTP Gateway/Auth/Risk/Trading/Allocation/Portfolio/Postg
   const sell=await f.order('SELL');expect(sell.status).toBe(201);expect(sell.body.realized_pnl_minor).toBe('18');
   const final=(await f.api('GET','/portfolio')).body;expect(final).toMatchObject({cashMinor:'318',marketValueMinor:'0',realizedPnlMinor:'18',reconciliationStatus:'OK',returnBps:600});expect(final.holdings).toHaveLength(0);
   const ledger=(await f.api('GET','/ledger/summary')).body.buckets;expect(ledger).toMatchObject({LONG_TERM_RESERVE:'7',PORTFOLIO_CASH:'318',PORTFOLIO_COST:'0',PORTFOLIO_PNL:'-18'});
-  expect((await f.api('GET','/portfolio/performance')).body.length).toBeGreaterThan(0);
+  expect((await f.api('GET','/portfolio/performance')).body).toHaveLength(0);
+  expect((await f.api('POST','/portfolio/snapshots',{})).status).toBe(201);
+  expect((await f.api('GET','/portfolio/performance')).body).toHaveLength(1);
   const balance=(await pool.query("SELECT t.id,sum(CASE WHEN e.direction='DEBIT' THEN e.amount_minor ELSE -e.amount_minor END)::text AS n FROM ledger_transactions t JOIN ledger_entries e ON e.transaction_id=t.id WHERE t.user_id=$1 GROUP BY t.id",[f.id])).rows;expect(balance.every(r=>r.n==='0')).toBe(true);
  },15000);
  it('funding cannot exceed reserve and duplicate funding is atomic',async()=>{const f=await fixture(false);expect((await f.api('POST','/portfolio/fund',{amountMinor:'308'},randomUUID())).status).toBe(409);const key=randomUUID(),rs=await Promise.all([f.api('POST','/portfolio/fund',{amountMinor:'300'},key),f.api('POST','/portfolio/fund',{amountMinor:'300'},key)]);expect(rs.every(r=>r.status===201)).toBe(true);expect(rs[0].body.id).toBe(rs[1].body.id);expect((await f.api('POST','/portfolio/fund',{amountMinor:'301'},key)).body.error).toBe('IDEMPOTENCY_CONFLICT');expect((await f.api('GET','/portfolio/cash')).body.cashMinor).toBe('300');});

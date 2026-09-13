@@ -1,5 +1,6 @@
+import {readValuation} from '@tipkhun/financial-read';
 import {randomUUID,createHash} from 'node:crypto';
-import {pool,transaction,type PoolClient} from '@tipkhun/database';
+import {pool,transaction,readTransaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
 import {lockOwner,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
 import {provider,requireFresh,type Quote} from './market.js';
@@ -23,7 +24,7 @@ export async function check(c:PoolClient,p:any,requestId:string){
  }
  return valid&&p.reconciliation_state==='OK';
 }
-export async function cashView(user:string){return transaction(async c=>{const p=await ensure(c,user),b=await buckets(c,user),r=(await c.query('SELECT amount_minor FROM portfolio_cash WHERE portfolio_id=$1',[p.id])).rows[0];return {mode:'PAPER',portfolioId:p.id,currency:'THB',cashMinor:r.amount_minor,longTermReservedCashMinor:(b.LONG_TERM_RESERVE??0n).toString()};});}
+export async function cashView(user:string){return readTransaction(async c=>{const p=(await c.query('SELECT id FROM portfolios WHERE user_id=$1',[user])).rows[0],b=await buckets(c,user),r=(await c.query('SELECT amount_minor FROM portfolio_cash WHERE portfolio_id=$1',[p?.id??null])).rows[0];return {mode:'PAPER',portfolioId:p?.id??null,currency:'THB',cashMinor:r?.amount_minor??'0',longTermReservedCashMinor:(b.LONG_TERM_RESERVE??0n).toString()};});}
 async function ownedAccount(c:PoolClient,user:string){const a=(await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[user])).rows[0];if(!a)throw new HttpError(409,'Start a paper account first');if(a.reconciliation_state!=='OK')throw new HttpError(409,'RECONCILIATION_REQUIRED');await ensureLedgerAccounts(c,user,a.id);for(const bucket of ['PORTFOLIO_CASH','PORTFOLIO_COST','PORTFOLIO_PNL','PORTFOLIO_FEES'])await c.query('INSERT INTO ledger_accounts(user_id,account_id,bucket) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[user,a.id,bucket]);return a;}
 export type OrderInput={side:'BUY'|'SELL';symbol:string;quantity:string};
 async function estimate(c:PoolClient,p:any,d:OrderInput){
@@ -75,18 +76,17 @@ export async function mutate(user:string,key:string,d:{amountMinor:string}|Order
   return saved;
  });if(!result)throw new HttpError(409,'RECONCILIATION_REQUIRED');return result;
 }
-export async function valuation(user:string,requestId:string){return transaction(async c=>{
- const p=await ensure(c,user),valid=await check(c,p,requestId),cash=BigInt((await c.query('SELECT amount_minor FROM portfolio_cash WHERE portfolio_id=$1',[p.id])).rows[0].amount_minor);
- const rows=(await c.query('SELECT h.*,a.symbol,a.name,a.sector FROM portfolio_holdings h JOIN assets a ON a.id=h.asset_id WHERE h.portfolio_id=$1 AND h.quantity>0 ORDER BY a.symbol',[p.id])).rows;
- let value=0n,cost=0n;const holdings:Array<{id:string;symbol:string;name:string;sector:string;quantity:string;costBasisMinor:string;averageCostMinor:string;marketValueMinor:string;unrealizedPnlMinor:string;quote:Quote;weightBps:number}>=[];for(const h of rows){const quote=await provider(user).getQuote(h.symbol);requireFresh(quote);const qty=quantity(String(h.quantity).replace(/0+$/,'').replace(/\.$/,'')),v=qty*BigInt(quote.priceMinor)/SCALE,k=BigInt(h.cost_basis_minor);value+=v;cost+=k;holdings.push({id:h.id,symbol:h.symbol,name:h.name,sector:h.sector,quantity:decimal(qty),costBasisMinor:k.toString(),averageCostMinor:(k*SCALE/qty).toString(),marketValueMinor:v.toString(),unrealizedPnlMinor:(v-k).toString(),quote,weightBps:0});}
- const total=cash+value;for(const h of holdings)h.weightBps=bps(BigInt(h.marketValueMinor),total);
- const sums=(await c.query("SELECT coalesce(sum(amount_minor) FILTER(WHERE type='FUND'),0)::text AS funded,coalesce(sum(realized_pnl_minor),0)::text AS pnl,coalesce(sum(fee_minor),0)::text AS fees FROM portfolio_transactions WHERE portfolio_id=$1",[p.id])).rows[0];
- const funded=BigInt(sums.funded),pnl=BigInt(sums.pnl),targets=(await c.query('SELECT target,weight_bps AS "weightBps" FROM target_allocations WHERE portfolio_id=$1 ORDER BY target',[p.id])).rows;
- const sectors:Record<string,bigint>={};for(const h of holdings)sectors[h.sector]=(sectors[h.sector]??0n)+BigInt(h.marketValueMinor);
- const peak=BigInt((await c.query('SELECT coalesce(max(total_value_minor-funded_minor),0)::text AS peak FROM portfolio_snapshots WHERE portfolio_id=$1',[p.id])).rows[0].peak),profit=total-funded;
- const result={id:p.id,mode:'PAPER',currency:'THB',source:'synthetic fixture',reconciliationStatus:valid?'OK':'RECONCILIATION_REQUIRED',cashMinor:cash.toString(),marketValueMinor:value.toString(),totalValueMinor:total.toString(),costBasisMinor:cost.toString(),unrealizedPnlMinor:(value-cost).toString(),realizedPnlMinor:pnl.toString(),fundedMinor:funded.toString(),feesMinor:sums.fees,returnBps:bps(profit,funded),holdings,targets:targets.map(t=>{const current=t.target==='CASH'?bps(cash,total):holdings.find(h=>h.symbol===t.target)?.weightBps??0;return {...t,currentBps:current,differenceBps:current-t.weightBps};}),risk:{cashBps:bps(cash,total),largestPositionBps:Math.max(0,...holdings.map(h=>h.weightBps)),drawdownBps:bps(peak>profit?peak-profit:0n,funded+(peak>0n?peak:0n)),unrealizedLossMinor:(value<cost?cost-value:0n).toString(),sectorExposure:Object.entries(sectors).map(([sector,n])=>({sector,weightBps:bps(n,total)})),warnings:holdings.filter(h=>h.weightBps>p.concentration_limit_bps).map(h=>`${h.symbol}: concentration above ${p.concentration_limit_bps} bps`)}};
- if(valid)await c.query('INSERT INTO portfolio_snapshots(portfolio_id,cash_minor,market_value_minor,total_value_minor,cost_basis_minor,unrealized_pnl_minor,realized_pnl_minor,funded_minor) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[p.id,result.cashMinor,result.marketValueMinor,result.totalValueMinor,result.costBasisMinor,result.unrealizedPnlMinor,result.realizedPnlMinor,result.fundedMinor]);return result;
-});}
+/** Reads never initialize, reconcile, or capture snapshots. */
+export async function valuation(user:string,_requestId?:string){return readTransaction(c=>readValuation(c,user,provider(user,c)));}
+export async function captureSnapshot(user:string,requestId:string){
+ const result=await transaction(async c=>{
+  const p=await ensure(c,user);if(!await check(c,p,requestId))return null;
+  const v=await readValuation(c,user,provider(user,c));
+  const snapshot=(await c.query('INSERT INTO portfolio_snapshots(portfolio_id,cash_minor,market_value_minor,total_value_minor,cost_basis_minor,unrealized_pnl_minor,realized_pnl_minor,funded_minor) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[p.id,v.cashMinor,v.marketValueMinor,v.totalValueMinor,v.costBasisMinor,v.unrealizedPnlMinor,v.realizedPnlMinor,v.fundedMinor])).rows[0];
+  await audit(c,user,'PORTFOLIO_SNAPSHOT_CREATED','Portfolio',p.id,requestId);return snapshot;
+ });if(!result)throw new HttpError(409,'RECONCILIATION_REQUIRED');return result;
+}
+export async function reconcilePortfolio(user:string,requestId:string){return transaction(async c=>{const p=await ensure(c,user);return {status:await check(c,p,requestId)?'OK':'RECONCILIATION_REQUIRED',mode:'PAPER'};});}
 export async function history(user:string,kind:'funding'|'orders'|'snapshots'){
- return transaction(async c=>{const p=await ensure(c,user);return kind==='snapshots'?(await c.query('SELECT * FROM (SELECT * FROM portfolio_snapshots WHERE portfolio_id=$1 ORDER BY created_at DESC LIMIT 200) s ORDER BY created_at',[p.id])).rows:(await c.query(`SELECT t.*,a.symbol FROM portfolio_transactions t LEFT JOIN assets a ON a.id=t.asset_id WHERE t.portfolio_id=$1 AND ${kind==='funding'?"t.type='FUND'":"t.type<>'FUND'"} ORDER BY t.created_at DESC LIMIT 200`,[p.id])).rows;});
+ return readTransaction(async c=>{const p=(await c.query('SELECT id FROM portfolios WHERE user_id=$1',[user])).rows[0];if(!p)return [];return kind==='snapshots'?(await c.query('SELECT * FROM (SELECT * FROM portfolio_snapshots WHERE portfolio_id=$1 ORDER BY created_at DESC LIMIT 200) s ORDER BY created_at',[p.id])).rows:(await c.query(`SELECT t.*,a.symbol FROM portfolio_transactions t LEFT JOIN assets a ON a.id=t.asset_id WHERE t.portfolio_id=$1 AND ${kind==='funding'?"t.type='FUND'":"t.type<>'FUND'"} ORDER BY t.created_at DESC LIMIT 200`,[p.id])).rows;});
 }

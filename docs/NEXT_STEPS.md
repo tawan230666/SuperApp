@@ -1,3 +1,25 @@
+# Continuation — 2026-09-13
+
+Resolved the unfinished AI provider/context TypeScript mismatch. Context now reads full owner-scoped trade count/net P&L and allocation totals in the existing READ ONLY transaction; monetary sums remain decimal strings. Removed references to nonexistent freshness metadata and explicitly disclose that per-category freshness is unavailable.
+
+The query route now uses the data-only AIProvider interface with a 5-second health/generation deadline and strict output validation before saving history. Malformed, unavailable, timed-out, execution-authorizing or provenance/mode-mismatched responses fail closed. Optional `copilotMode` accepts the six declared labels and defaults to `ASK_FINANCIAL_QUESTION`; mode-specific analysis is still pending (all currently use the existing deterministic summary). Provider fixtures are never selected by client input. A deadline stops waiting; it does not claim to terminate arbitrary future provider work.
+
+Verification: workspace `pnpm build`, `pnpm lint`, and `pnpm test:unit` passed; AI boundary suite is 11 passing tests, including six new cases. Added two database integration cases for owned aggregates and request modes; these are NOT runtime-verified. `node tool/integration.mjs ai` failed in migration setup before test cases ran. Docker socket is absent and `open -a Docker` reports no such application. Browser acceptance was not rerun because its database prerequisite is unavailable. Flutter was unchanged and not retested.
+
+Remaining: restore a reachable dedicated test database, run full integration/browser acceptance, obtain the original Phase 6 acceptance specification, then close its remaining context/provenance, mode-specific review, API/UI, Flutter, history and audit gaps. Phase 6 is still PARTIAL. No checkpoint recovery, commit, push or deployment performed; source has no `.git` and the previously recorded temporary recovery checkout is absent.
+
+---
+
+# Current next step — Phase 6 continuation (2026-09-11)
+
+The user authorized Phase 6 with read-only financial access first. That safety boundary and a working local Mock Copilot API/React UI are implemented; see [AI_COPILOT.md](AI_COPILOT.md) and [PROGRESS.md](PROGRESS.md). Do not reintroduce financial writes/reconciliation into GET/context paths.
+
+Obtain the original Phase 6 prompt/acceptance checklist and compare remaining requirements against the delivered scope before marking the full milestone completed. The available prompt specified the safety boundary but referred to an earlier full prompt that was not present. Flutter's local assistant remains preserved; remote native Copilot UI and broader research features are not claimed.
+
+AI remains READ / ANALYZE / PROPOSE ONLY; Risk Engine is authority; execution is inaccessible to AI. No external/paid AI, live broker, real money or production deployment. The model downgrade recommendation is advisory; no model/config change was made.
+
+---
+
 # Current next step — after Phase 5 acceptance (2026-09-11)
 
 Phase 2–5 are COMPLETED. Do not restart their architecture or treat the historical blockers below as current.
@@ -71,3 +93,6 @@ The earlier blocker is resolved. PostgreSQL integration and real React browser
 acceptance passed on 2026-09-10. `pnpm test` now includes DB tests and fails if the
 test DB is unavailable. Proceed with atomic reservations, idempotent durable
 paper orders, reconciliation, emergency-stop races and remote bot UI.
+# Phase 6 completed — 2026-09-13
+
+Phase 6 is complete against the authoritative checklist supplied by the user. Keep the AI boundary READ / ANALYZE / PROPOSE ONLY and preserve the existing synthetic Paper/fixture limitations. The next work requires a new explicit milestone; do not begin Phase 7, broker integration, external AI, or real-money flows automatically.

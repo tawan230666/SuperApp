@@ -15,10 +15,11 @@ pool.on("error", () => {
 });
 export async function transaction<T>(
   work: (client: pg.PoolClient) => Promise<T>,
+  readOnly = false,
 ): Promise<T> {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query(readOnly ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" : "BEGIN");
     const value = await work(client);
     await client.query("COMMIT");
     return value;
@@ -34,3 +35,5 @@ export async function ready() {
 }
 
 export { migrations } from "./migrations.js";
+
+export const readTransaction = <T>(work:(client:pg.PoolClient)=>Promise<T>) => transaction(work,true);

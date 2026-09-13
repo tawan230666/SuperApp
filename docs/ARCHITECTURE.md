@@ -96,3 +96,6 @@ React /long-term and Flutter RemotePortfolioRepository → existing authenticate
 Fixture provider is the default. The deterministic provider is enabled only on explicitly guarded test databases. No external market connection. Portfolio state, quantities, average cost, snapshots, targets and watchlist survive process restart. A portfolio reconciliation latch blocks new mutations; no in-memory source of truth.
 
 Flutter remote transport now accepts/saves access and rotated refresh credentials correctly, coordinates concurrent refreshes, retries once, clears logout state, uses HTTPS outside loopback development, and stores mobile refresh credentials in OS secure storage. Web can use ephemeral memory sessions instead of persistent browser credential storage. Platform local engine/UI is preserved. Shared React → Flutter → React verification runs against real HTTP/PostgreSQL in the browser harness.
+# Phase 6 continuation
+
+The AI path is an isolated advisory lane: React/Flutter → authenticated Gateway → short-lived signed identity → restricted AI service → READ ONLY financial context and append-only AI history. React and Flutter use the same `/api/v1/copilot` API; Flutter `RemoteAIRepository` does not maintain a local source of truth.

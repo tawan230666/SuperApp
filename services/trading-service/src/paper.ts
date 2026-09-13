@@ -1,6 +1,7 @@
+import {readBotStatus} from '@tipkhun/financial-read';
 import {createHash} from 'node:crypto';
 import {z} from 'zod';
-import {pool,transaction,type PoolClient} from '@tipkhun/database';
+import {pool,transaction,readTransaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
 import {currentPlan,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
 export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage','profit','profit101','even']).default('fill')}).strict();
@@ -170,14 +171,7 @@ export async function reconcileLocked(c:PoolClient,a:any){
 }
 export async function reconcile(userId:string){return transaction(async c=>{await lockOwner(c,userId);const a=await account(c,userId);if(!a)throw new HttpError(404,'Paper account not found');return reconcileLocked(c,a);});}
 export async function recover(){const users=await pool.query("SELECT DISTINCT user_id FROM accounts WHERE environment='paper'");for(const row of users.rows)await reconcile(row.user_id);}
-export async function status(userId:string){return transaction(async c=>{
- await lockOwner(c,userId);const a=await account(c,userId);if(!a)return {mode:'PAPER',liveTrading:'LOCKED',state:'READY',account:null,brokerStatus:'NOT_STARTED'};
- const reconciliation=await reconcileLocked(c,a);const b=(await c.query('SELECT * FROM bot_sessions WHERE account_id=$1',[a.id])).rows[0];
-  const p=(await c.query("SELECT coalesce(sum(quantity*101),0)::text AS value,coalesce(sum(quantity*101-cost_minor),0)::text AS unrealized,count(*)::int AS count FROM positions WHERE account_id=$1 AND state='OPEN'",[a.id])).rows[0];
- const pending=(await c.query("SELECT count(*)::int AS n FROM orders WHERE account_id=$1 AND paper_order AND state IN ('CREATED','RISK_CHECKED','SUBMITTED','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')",[a.id])).rows[0].n;
- const daily=(await c.query("SELECT coalesce(sum(net_pnl_minor),0)::text AS pnl FROM trades WHERE account_id=$1 AND created_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",[a.id])).rows[0].pnl;
- const stale=b.last_heartbeat&&Date.now()-new Date(b.last_heartbeat).getTime()>15000; return {mode:'PAPER',liveTrading:'LOCKED',state:b.state,healthStatus:reconciliation.status!=='OK'?'RECONCILIATION_REQUIRED':stale?'STALE':b.state==='RUNNING'?'HEALTHY':'DEGRADED',paperAccountId:a.id,account:{cashMinor:a.cash_minor,equityMinor:(BigInt(a.cash_minor)+BigInt(p.value.split('.')[0])).toString(),realizedPnlMinor:a.realized_pnl_minor,unrealizedPnlMinor:p.unrealized,feesMinor:a.fees_minor},openPositions:p.count,pendingOrders:pending,dailyPnlMinor:daily,lastHeartbeat:b.last_heartbeat,strategyVersion:b.strategy_version,brokerStatus:reconciliation.status==='OK'?'PAPER_CONNECTED':'RECONCILIATION_REQUIRED',closePolicy:'Explicit close only; emergency does not liquidate'};
-});}
+export async function status(userId:string){return readTransaction(c=>readBotStatus(c,userId));}
 export async function heartbeat(){await pool.query("UPDATE bot_sessions SET last_heartbeat=now() WHERE state IN ('RUNNING','PAUSED') AND account_id IN (SELECT id FROM accounts WHERE environment='paper')");}
 export async function monitor(){
  const stale=await pool.query("SELECT b.account_id,a.user_id FROM bot_sessions b JOIN accounts a ON a.id=b.account_id WHERE b.state='RUNNING' AND (b.last_heartbeat IS NULL OR b.last_heartbeat<now()-interval '15 seconds')");
