@@ -43,3 +43,24 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local secrets and developer artifacts
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+**/key.properties
+**/local.properties
+**/ephemeral/
+**/.gradle/
+node_modules/
+**/.pnpm-store/
+*.tsbuildinfo
+playwright-report/
+test-results/
+# Personal reference documents are not app assets
+/images/

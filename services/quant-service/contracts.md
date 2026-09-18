@@ -1,0 +1,1 @@
+Planned endpoints: `POST /v1/backtests`, `GET /v1/backtests/:id`, `POST /v1/research`. Inputs will require versioned strategy hashes, dataset identifiers, train/validation/out-of-sample ranges and explicit fee/slippage assumptions.

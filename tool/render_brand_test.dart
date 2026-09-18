@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -7,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:superapp/main.dart';
 import 'package:superapp/ui/brand_mark.dart';
+import 'package:superapp/ui/plan_forms.dart';
+import 'package:superapp/domain/investment_plan.dart';
 
 void main() {
   testWidgets('Export brand assets and design previews', (tester) async {
@@ -53,7 +56,7 @@ void main() {
         RepaintBoundary(
           key: key,
           child: ColoredBox(
-            color: const Color(0xFF123C32),
+            color: const Color(0xFF073C31),
             child: Center(child: BrandMark(size: size * .75)),
           ),
         ),
@@ -61,6 +64,72 @@ void main() {
       await tester.pumpAndSettle();
       await save(file.path);
     }
+    tester.view.physicalSize = const Size.square(1024);
+    await tester.pumpWidget(
+      RepaintBoundary(key: key, child: const BrandMark(size: 1024)),
+    );
+    await tester.pumpAndSettle();
+    await save('assets/brand/tipkhun-mark.png');
+    tester.view.physicalSize = const Size(620, 140);
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: key,
+        child: const Directionality(
+          textDirection: TextDirection.ltr,
+          child: ColoredBox(
+            color: Colors.white,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  BrandMark(size: 80),
+                  SizedBox(width: 24),
+                  Text(
+                    'Tipkhun Capital',
+                    style: TextStyle(
+                      fontFamily: 'NotoSansThai',
+                      fontSize: 36,
+                      color: Color(0xFF142E29),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await save('assets/brand/tipkhun-header.png');
+
+    // Windows ICO container with PNG payloads at native icon sizes.
+    final iconSizes = [16, 32, 128, 256];
+    final payloads = iconSizes
+        .map(
+          (size) => File(
+            'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_$size.png',
+          ).readAsBytesSync(),
+        )
+        .toList();
+    final directory = ByteData(6 + 16 * payloads.length)
+      ..setUint16(2, 1, Endian.little)
+      ..setUint16(4, payloads.length, Endian.little);
+    var offset = directory.lengthInBytes;
+    for (var i = 0; i < payloads.length; i++) {
+      final base = 6 + 16 * i;
+      directory.setUint8(base, iconSizes[i] == 256 ? 0 : iconSizes[i]);
+      directory.setUint8(base + 1, iconSizes[i] == 256 ? 0 : iconSizes[i]);
+      directory.setUint16(base + 4, 1, Endian.little);
+      directory.setUint16(base + 6, 32, Endian.little);
+      directory.setUint32(base + 8, payloads[i].length, Endian.little);
+      directory.setUint32(base + 12, offset, Endian.little);
+      offset += payloads[i].length;
+    }
+    File('windows/runner/resources/app_icon.ico').writeAsBytesSync([
+      ...directory.buffer.asUint8List(),
+      for (final payload in payloads) ...payload,
+    ]);
     for (final size in [
       const Size(320, 740),
       const Size(390, 844),
@@ -90,6 +159,22 @@ void main() {
         expect(find.byType(AlertDialog), findsNothing);
         await save('docs/previews/${entry.key}-${size.width.toInt()}.png');
         expect(tester.takeException(), isNull, reason: entry.key);
+      }
+      for (final form in ['plan', 'trade', 'ratios']) {
+        final context = tester.element(find.byType(CapitalHome));
+        switch (form) {
+          case 'plan':
+            showPlanForm(context, InvestmentPlan());
+          case 'trade':
+            showTradeForm(context, InvestmentPlan());
+          case 'ratios':
+            showRatioForm(context, InvestmentPlan());
+        }
+        await tester.pumpAndSettle();
+        await save('docs/previews/$form-${size.width.toInt()}.png');
+        expect(tester.takeException(), isNull, reason: form);
+        await tester.tap(find.text('ยกเลิก'));
+        await tester.pumpAndSettle();
       }
       await tester.pumpWidget(const SizedBox());
     }

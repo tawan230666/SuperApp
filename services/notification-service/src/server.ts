@@ -1,0 +1,2 @@
+import express from 'express'; import type { Express } from 'express';
+export const app: Express=express(); app.get('/health',(_req,res)=>res.json({service:'notification-service',status:'ok',mode:'disabled',timestamp:new Date().toISOString()})); app.get('/ready',(_req,res)=>res.json({service:'notification-service',status:'ready',timestamp:new Date().toISOString()})); if(process.env.NODE_ENV!=='test') app.listen(Number(process.env.NOTIFICATION_PORT??3007));
