@@ -1,9 +1,12 @@
 import {pool} from '@tipkhun/database';
+import {brokerRoutes,brokerEvent} from './broker/routes.js';
 import {z} from 'zod';
 import {baseApp,authenticate,finish,HttpError} from '@tipkhun/auth';
 import {control,createOrder,getOrder,getPosition,getTrade,cancelOrder,closePosition,execute,reconcile,recover,status,list,heartbeat,monitor} from './paper.js';
 export const app=baseApp('trading-service',async()=>{await pool.query('SELECT order_id FROM paper_broker_orders LIMIT 0');const r=await fetch(`${process.env.RISK_SERVICE_URL??'http://localhost:3001'}/ready`,{signal:AbortSignal.timeout(2000)});if(!r.ok)throw new Error('Risk unavailable');});
+app.post('/sandbox/broker-events',async(req,res)=>res.json(await brokerEvent(req.body,req.header('x-broker-signature')??'',crypto.randomUUID())));
 app.use('/v1',authenticate());
+app.use('/v1',brokerRoutes());
 for(const action of ['start','pause','resume','stop','emergency-stop'])app.post(`/v1/bot/${action}`,async(req,res)=>{z.object({}).strict().parse(req.body??{});res.json(await control(res.locals.identity.id,action,res.locals.requestId));});
 app.get('/v1/bot/status',async(_req,res)=>res.json(await status(res.locals.identity.id)));
 app.post('/v1/orders',async(req,res)=>res.status(201).json(await createOrder(res.locals.identity.id,req.body,req.header('idempotency-key')??'',req.header('authorization')!,res.locals.requestId)));

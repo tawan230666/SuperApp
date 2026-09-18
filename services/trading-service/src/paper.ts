@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {z} from 'zod';
 import {pool,transaction,readTransaction,type PoolClient} from '@tipkhun/database';
 import {audit,HttpError} from '@tipkhun/auth';
-import {currentPlan,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
+import {currentPlan,snapshot,validateBrokerDispatch,lockOwner,transitionOrder,ensureLedgerAccounts,ledgerTransaction,notify} from '@tipkhun/risk-data';
 export const orderSchema=z.object({instrument:z.literal('SYNTHETIC-THB'),quantity:z.string().regex(/^[1-9][0-9]{0,5}$/),type:z.literal('MARKET'),scenario:z.enum(['fill','partial','reject','error','unknown','slippage','profit','profit101','even']).default('fill')}).strict();
 const fee=(notional:bigint)=>(notional+999n)/1000n; // 10bps rounded up in minor units.
 export async function account(c:PoolClient,userId:string){return (await c.query("SELECT * FROM accounts WHERE user_id=$1 AND environment='paper'",[userId])).rows[0]??null;}
@@ -92,7 +92,9 @@ export async function execute(userId:string,orderId:string,requestId:string,cont
   await lockOwner(c,userId);const o=await ownedOrder(c,userId,orderId),a=await account(c,userId);const b=(await c.query('SELECT state FROM bot_sessions WHERE account_id=$1',[a.id])).rows[0];
   if(!(o.state==='RISK_CHECKED'||(continuation&&o.state==='PARTIALLY_FILLED')))return o;
   if(a.emergency_stop||b.state!=='RUNNING'||a.reconciliation_state!=='OK'){await cancelLocked(c,userId,o,requestId);return o;}
-  if(!(await c.query('SELECT order_id FROM risk_reservations WHERE order_id=$1 AND released_at IS NULL',[o.id])).rowCount)throw new HttpError(409,'Committed risk reservation required');
+  const reservation=(await c.query<{amount_minor:string}>('SELECT amount_minor FROM risk_reservations WHERE order_id=$1 AND released_at IS NULL',[o.id])).rows[0];
+  if(!reservation)throw new HttpError(409,'Committed risk reservation required');
+  if(!await validateBrokerDispatch(c,userId,BigInt(reservation.amount_minor),o.plan_version_id)){await cancelLocked(c,userId,o,requestId);return o;}
   if(o.state==='RISK_CHECKED')await transitionOrder(c,o,'SUBMITTED','Reservation verified before broker submission');
   const result=await broker.fill(c,o,continuation);
   if(result.kind==='unknown'){await transitionOrder(c,o,'UNKNOWN','Paper broker outcome unknown');await c.query("UPDATE accounts SET reconciliation_state='RECONCILIATION_REQUIRED' WHERE id=$1",[a.id]);return o;}
@@ -117,6 +119,7 @@ export async function cancelOrder(userId:string,id:string,requestId:string){retu
 export async function closePosition(userId:string,id:string,requestId:string){return transaction(async c=>{
  await lockOwner(c,userId);const p=(await c.query("SELECT p.* FROM positions p JOIN accounts a ON a.id=p.account_id WHERE p.id=$1 AND a.user_id=$2 AND a.environment='paper'",[id,userId])).rows[0];if(!p)throw new HttpError(404,'Position not found');
  if(p.state==='CLOSED')return (await c.query('SELECT * FROM trades WHERE paper_order_id=$1',[p.order_id])).rows[0];
+ if((await snapshot(c,userId,true)).reconciliationRequired)throw new HttpError(409,'Reconciliation required');
  const o=await ownedOrder(c,userId,p.order_id);if(o.state==='UNKNOWN')throw new HttpError(409,'Unknown outcome requires reconciliation before closing');
  if(o.state==='PARTIALLY_FILLED')await cancelLocked(c,userId,o,requestId);
  const quantity=BigInt(String(p.quantity).split('.')[0]),price=o.scenario==='profit'?120n:o.scenario==='profit101'?204n:o.scenario==='even'?101n:99n,proceeds=quantity*price,fees=fee(proceeds),net=proceeds-BigInt(p.cost_minor)-BigInt(p.entry_fees_minor)-fees;

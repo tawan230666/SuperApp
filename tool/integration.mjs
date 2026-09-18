@@ -1,4 +1,5 @@
 import {provisionAI,aiEnvironment} from './ai-runtime.mjs';
+import {randomBytes} from 'node:crypto';
 import {requireFreePorts} from './test-ports.mjs';
 import { existsSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -16,6 +17,7 @@ const env = {
   NODE_ENV: "test",
   TEST_MODE: "1",
   RUN_DB_TESTS: "1",
+  BROKER_VAULT_KEY:randomBytes(32).toString('hex'),
   PAPER_MARKET_PROVIDER: "deterministic",
   PORTFOLIO_SERVICE_URL: "http://127.0.0.1:13006",
   RISK_SERVICE_URL: "http://127.0.0.1:13001",
@@ -64,7 +66,7 @@ try {
       "exec",
       "vitest",
       "run",
-      process.argv[2] === "ai" ? "src/ai.integration.test.ts" : process.argv[2] === "portfolio" ? "src/portfolio.integration.test.ts" : process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
+      process.argv[2] === "broker" ? "src/broker.integration.test.ts" : process.argv[2] === "ai" ? "src/ai.integration.test.ts" : process.argv[2] === "portfolio" ? "src/portfolio.integration.test.ts" : process.argv[2] === "paper" ? "src/paper.integration.test.ts" : "src/integration.test.ts",
     ],
     { env, stdio: "inherit" },
   );

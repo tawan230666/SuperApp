@@ -8,6 +8,7 @@ import {
   persistedRiskProfileSchema as profileSchema,
 } from "@tipkhun/contracts";
 export { minor, planSchema, profileSchema };
+export {authorizeBroker,validateBrokerDispatch} from './broker.js';
 const planSelect =
   'SELECT p.id AS "planId", v.id AS "versionId",v.version,v.capital_minor AS "capitalMinor",v.daily_loss_limit_minor AS "dailyLossLimitMinor",v.risk_per_trade_minor AS "riskPerTradeMinor",v.max_trades AS "maxTrades",v.effective_at AS "effectiveAt" FROM investment_plans p JOIN plan_versions v ON v.plan_id=p.id WHERE p.user_id=$1 ORDER BY v.version DESC LIMIT 1';
 export async function currentPlan(c: PoolClient, userId: string) {
@@ -21,7 +22,7 @@ export async function snapshot(c: PoolClient, userId: string, locked=false) {
   const p = await currentPlan(c, userId);
   if (!p) throw new HttpError(404, "Create your first risk plan");
   const a = await c.query(
-    "SELECT count(*)::int AS count,coalesce(bool_or(emergency_stop),false) AS stopped FROM accounts WHERE user_id=$1 AND environment IN ('simulation','paper')",
+    "SELECT count(*)::int AS count,coalesce(bool_or(emergency_stop),false) AS stopped,coalesce(bool_or(reconciliation_state<>'OK'),false) AS unresolved FROM accounts WHERE user_id=$1 AND environment IN ('simulation','paper')",
     [userId],
   );
   if (!a.rows[0].count) throw new HttpError(409, "Simulation account required");
@@ -46,7 +47,11 @@ export async function snapshot(c: PoolClient, userId: string, locked=false) {
   if (!profile?.max_positions)
     throw new HttpError(409, "Complete your risk profile");
   const equityResult = await c.query(
-    `WITH ledger AS (SELECT t.id,t.created_at,sum(t.net_pnl_minor) OVER (ORDER BY t.created_at,t.id) AS pnl FROM trades t JOIN accounts a ON a.id=t.account_id WHERE a.user_id=$1 AND a.environment IN ('simulation','paper')) SELECT coalesce((SELECT pnl FROM ledger ORDER BY created_at DESC,id DESC LIMIT 1),0)::text AS pnl,coalesce(max(pnl),0)::text AS peak FROM ledger`,
+    `WITH realized AS (
+      SELECT t.id,t.created_at,t.net_pnl_minor AS amount FROM trades t JOIN accounts a ON a.id=t.account_id WHERE a.user_id=$1 AND a.environment IN ('simulation','paper')
+      UNION ALL SELECT id,executed_at,realized_pnl_minor FROM broker_fills WHERE user_id=$1
+    ), ledger AS (SELECT id,created_at,sum(amount) OVER (ORDER BY created_at,id) AS pnl FROM realized)
+    SELECT coalesce((SELECT pnl FROM ledger ORDER BY created_at DESC,id DESC LIMIT 1),0)::text AS pnl,coalesce(max(pnl),0)::text AS peak FROM ledger`,
     [userId],
   );
   const capital = BigInt(p.capitalMinor),
@@ -56,12 +61,25 @@ export async function snapshot(c: PoolClient, userId: string, locked=false) {
   const drawdownReached =
     (peak - equity) * 10000n >= peak * BigInt(profile.max_drawdown_bps);
   const paper=await c.query(`SELECT coalesce(sum(r.amount_minor) FILTER (WHERE r.released_at IS NULL),0)::text AS reserved,count(*) FILTER (WHERE o.approved_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND (o.state NOT IN ('REJECTED','CANCELLED','EXPIRED') OR o.filled_quantity>0))::int AS slots FROM orders o JOIN accounts a ON a.id=o.account_id LEFT JOIN risk_reservations r ON r.order_id=o.id WHERE a.user_id=$1 AND o.paper_order`,[userId]);
-  const used = BigInt(t.rows[0].used),
-    reserved = BigInt(r.rows[0].reserved)+BigInt(paper.rows[0].reserved),
+  // Broker sandbox shares the same owner lock and risk budget as existing Paper.
+  const broker=(await c.query<{reserved:string;used:string;slots:number;positions:number;stopped:boolean;unresolved:boolean}>(`SELECT
+   ((SELECT coalesce(sum(risk_reserved_minor),0) FROM broker_orders WHERE user_id=$1)+(SELECT coalesce(sum((p->>'costMinor')::bigint),0) FROM broker_connections b CROSS JOIN LATERAL jsonb_array_elements(b.positions) p WHERE b.user_id=$1))::text AS reserved,
+   (SELECT coalesce(sum(greatest(-realized_pnl_minor,0)),0)::text FROM broker_fills WHERE user_id=$1 AND executed_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS used,
+   (SELECT count(*)::int FROM broker_orders WHERE user_id=$1 AND confirmed_at>=date_trunc('day',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND (state NOT IN ('REJECTED','CANCELLED') OR filled_quantity>0)) AS slots,
+   ((SELECT coalesce(sum(jsonb_array_length(positions)),0) FROM broker_connections WHERE user_id=$1)+(SELECT count(*) FROM broker_orders WHERE user_id=$1 AND side='BUY' AND risk_reserved_minor>0 AND filled_quantity=0))::int AS positions,
+   (SELECT coalesce(bool_or(emergency_stop),false) FROM broker_connections WHERE user_id=$1) AS stopped,
+   (SELECT coalesce(bool_or(reconciliation_state<>'OK'),false) FROM broker_connections WHERE user_id=$1) AS unresolved`,[userId])).rows[0];
+  a.rows[0].stopped ||= broker.stopped;
+  pos.rows[0].count += broker.positions;
+  // Both execution paths must count Paper reservations before a position exists.
+  const pendingPaper=(await c.query<{count:number}>("SELECT count(*)::int AS count FROM orders o JOIN accounts a ON a.id=o.account_id JOIN risk_reservations r ON r.order_id=o.id WHERE a.user_id=$1 AND r.released_at IS NULL AND o.filled_quantity=0",[userId])).rows[0];
+  pos.rows[0].count += pendingPaper.count;
+  const used = BigInt(t.rows[0].used)+BigInt(broker.used),
+    reserved = BigInt(r.rows[0].reserved)+BigInt(paper.rows[0].reserved)+BigInt(broker.reserved),
     limit = BigInt(p.dailyLossLimitMinor);
   const budget = equity < limit ? equity : limit;
   const remaining = budget - used - reserved;
-  const tradesUsed = t.rows[0].trades + r.rows[0].pending + paper.rows[0].slots;
+  const tradesUsed = t.rows[0].trades + r.rows[0].pending + paper.rows[0].slots + broker.slots;
   return {
     ...p,
     equityMinor: equity.toString(),
@@ -72,10 +90,12 @@ export async function snapshot(c: PoolClient, userId: string, locked=false) {
     tradesUsed,
     tradesRemaining: Math.max(0, p.maxTrades - tradesUsed),
     emergencyStop: a.rows[0].stopped,
+    reconciliationRequired: a.rows[0].unresolved || broker.unresolved,
     positionsUsed: pos.rows[0].count,
     maxPositions: profile.max_positions,
     status:
       a.rows[0].stopped ||
+      a.rows[0].unresolved || broker.unresolved ||
       drawdownReached ||
       pos.rows[0].count >= profile.max_positions ||
       remaining <= 0n ||
@@ -189,6 +209,7 @@ export async function authoritativeCheck(
     const s = await snapshot(c, userId);
     let reason: string | null = null;
     if (s.emergencyStop) reason = "Emergency stop is active";
+    else if (s.reconciliationRequired) reason = "Reconciliation required";
     else if (BigInt(s.riskUsedMinor) >= BigInt(s.dailyLossLimitMinor))
       reason = "Daily loss limit reached";
     else if (s.drawdownReached) reason = "Maximum drawdown reached";
@@ -245,7 +266,7 @@ export async function reservePaperOrder(userId:string,orderId:string,requestId:s
   const req=BigInt(row.requested_risk_minor);let reason:string|null=null;
   if(row.emergency_stop||s.emergencyStop)reason='Emergency stop is active';
   else if(row.bot_state!=='RUNNING')reason='Bot is not running';
-  else if(row.reconciliation_state!=='OK')reason='Reconciliation required';
+  else if(row.reconciliation_state!=='OK'||s.reconciliationRequired)reason='Reconciliation required';
   else if(BigInt(s.riskUsedMinor)>=BigInt(s.dailyLossLimitMinor))reason='Daily loss limit reached';
   else if(s.drawdownReached)reason='Maximum drawdown reached';
   else if(s.tradesRemaining<=0)reason='Maximum trades reached';
@@ -254,9 +275,6 @@ export async function reservePaperOrder(userId:string,orderId:string,requestId:s
   else if(req>BigInt(s.riskRemainingMinor))reason='Proposed risk exceeds remaining budget';
   else if(req>BigInt(row.cash_minor)-BigInt(outstanding.amount)-BigInt(earmarked.amount)-BigInt(funded.amount))reason='Insufficient unreserved paper cash';
   if(reason){await transitionOrder(c,row,'REJECTED',reason);await c.query('UPDATE orders SET reject_reason=$2 WHERE id=$1',[row.id,reason]);await audit(c,userId,'ORDER_REJECTED','Order',row.id,requestId);return {approved:false,reason,orderId,state:row.state};}
-  // Count pending reservations as future position slots as well as open positions.
-  const pending=(await c.query("SELECT count(*)::int AS n FROM orders o JOIN accounts a ON a.id=o.account_id JOIN risk_reservations r ON r.order_id=o.id WHERE a.user_id=$1 AND r.released_at IS NULL AND o.filled_quantity=0",[userId])).rows[0].n;
-  if(s.positionsUsed+pending>=s.maxPositions){await transitionOrder(c,row,'REJECTED','Maximum positions reached');await audit(c,userId,'ORDER_REJECTED','Order',row.id,requestId);return {approved:false,reason:'Maximum positions reached',orderId};}
   await c.query('INSERT INTO risk_reservations(order_id,amount_minor) VALUES($1,$2)',[row.id,row.requested_risk_minor]);
   await c.query('UPDATE orders SET approved_at=now(),plan_version_id=$2 WHERE id=$1',[row.id,s.versionId]);
   await transitionOrder(c,row,'RISK_CHECKED','Authoritative risk reservation committed');
